@@ -1,0 +1,8 @@
+[package]
+name = "variability"
+version = "0.1"
+lean_version = "3.4.2"
+path = "src"
+
+[dependencies]
+mathlib = {path = "/Users/ramy/.lean/_target/deps/mathlib"}
