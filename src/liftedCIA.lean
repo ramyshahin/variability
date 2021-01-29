@@ -132,17 +132,6 @@ def GSN_IA' (S S' : Sys')
 universe u
 variables {α β γ : Type}
 
-theorem fun_comp_correct : 
-    ∀ (f₁  : set  α → set  β) (f₂  : set  β  → set  γ)
-      (f₁' : set' α → set' β) (f₂' : set' β  → set' γ),
-    (∀ (a : set' α) (pc : PC), f₁ (index a pc) = index (f₁' a) pc) →
-    (∀ (b : set' β) (pc : PC), f₂ (index b pc) = index (f₂' b) pc) →
-     ∀ (a : set' α) (b : set' β) (pc : PC), f₂ (f₁ (index a pc)) = 
-        index (f₂' (f₁' a)) pc :=
-begin
-intros f₁ f₂ f₃ f₄ h₁ h₂ a h₃ pc, rw h₁, rw← h₂
-end
-
 open set
 open variability
 open variability.has_index

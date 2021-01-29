@@ -4,7 +4,7 @@ namespace variability
 
 universes u v 
 
-variables {α β : Type}
+variables {α β γ : Type}
 
 def PC := Prop
 
@@ -45,5 +45,18 @@ instance : has_union (set' α) :=
 
 def image (f : α → β) (s : set' α) : set' β :=
 λ x, (∀ y, f y = x ∧ s y)  
+
+infix `|`:90 := index
+
+variables (f₁  : set  α → set  β) (f₂  : set  β  → set  γ)
+variables (f₁' : set' α → set' β) (f₂' : set' β  → set' γ)
+theorem fun_comp_correct :
+    (∀ a ρ, (f₁ (a | ρ) = (f₁' a) | ρ)) →
+    (∀ b ρ, (f₂ (b | ρ) = (f₂' b) | ρ)) →
+    (∀ a ρ, (f₂ ∘ f₁) (a | ρ) = ((f₂' ∘ f₁') a) | ρ) :=
+begin
+intros h₁ h₂ a ρ, simp, 
+rw h₁, rw← h₂ 
+end
 
 end variability
