@@ -148,11 +148,8 @@ begin
 end 
 
 theorem GSN_IA'_correct : 
-    ∀   (S S' : Sys') (A  : GSN') (R  : TraceRel') 
-        (D  : Delta') (pc : PC),
-    index (GSN_IA' S S' A R D) pc =
-    GSN_IA  (index S pc) (index S' pc) (index A pc) 
-            (index R pc) (indexDelta D pc) 
+    ∀ (S S' : Sys') (A  : GSN') (R  : TraceRel') (D : Delta') (pc : PC),
+    (GSN_IA' S S' A R D) | pc = GSN_IA  (S | pc) (S' | pc) (A | pc) (R | pc) (D | pc) 
     :=
 begin
     intros, rw GSN_IA', rw GSN_IA, simp, 
