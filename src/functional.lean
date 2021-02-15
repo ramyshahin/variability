@@ -4,6 +4,7 @@
 import data.fintype
 import data.finset
 import tactic.basic
+import order.lattice
 
 namespace functional
 
@@ -157,14 +158,48 @@ begin
     unfold disjointList, intros, 
 end
 
+lemma cover_append {Feature : Type} [t: fintype Feature] [d: decidable_eq Feature] {α : Type} : 
+    ∀ (l₁ l₂ : list (@Var Feature t α)),
+    cover (list.append l₁ l₂) = cover l₁ ∪ cover l₂ :=
+begin
+    intros, induction l₁,
+    -- base case
+    simp, unfold cover, simp, unfold semantics, simp,
+    -- induction
+    unfold cover, simp, unfold semantics, unfold cover at l₁_ih, simp at l₁_ih, 
+    rw l₁_ih, rw← finset.union_assoc, cc 
+end
+ 
+lemma interAll {α : Type} {c: finset α} [d: decidable_eq α] [t: fintype α]:
+    (c.to_set) ∩ (finset.to_set (finset.univ)) = (c.to_set) := 
+begin
+    intros, --lift finset.univ to (set α) using finset.lift,
+    apply set.inter_eq_self_of_subset_left, unfold finset.to_set, simp, 
+    apply set.subset_univ 
+end 
+
+lemma apply_inner_complete {Feature : Type} [t: fintype Feature] [d: decidable_eq Feature] {α β : Type} : 
+    ∀ (f : @Lifted Feature t d (α → β)) (v : @Lifted Feature t d α),
+    cover (apply_inner f v) = cover f.s :=
+begin
+    intros, unfold apply_inner, induction f.s,
+    -- base case
+    simp, refl,
+    -- induction,
+    simp, rw cover_append, simp at ih, rw ih, rw apply_single_cover, rw v.comp, --rw← finset.inf_eq_inter,
+    --unfold allConfigs, unfold Config, rw← finset.univ, unfold finset.powerset, rw set.inter_univ,
+    rw interAll, 
+    unfold finset.inter, 
+    --set.inter_eq_self_of_subset_left,
+    simp, unfold finset.has_inter.inter, 
+    unfold cover, simp, unfold semantics, apply v.comp,    
+end
 
 def apply {Feature : Type} [t: fintype Feature] [d: decidable_eq Feature] 
     (f : @Lifted Feature t d (α → β)) (v : @Lifted Feature t d α) : @Lifted Feature t d β :=
     ⟨apply_inner f v,
-    begin 
-        intros, simp, intros, 
-    end,
-    _⟩
+     _,
+     apply_inner_complete⟩
 
 end func
 
