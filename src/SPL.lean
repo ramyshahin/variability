@@ -1,6 +1,6 @@
 -- SPL.lean
 -- Software Product Line variability
-import data.fintype
+--import data.fintype
 import data.finset
 
 namespace SPL
