@@ -1,29 +1,17 @@
 -- functional.lean
 -- variability-aware functional programming
---import .variability
+import .variability
 --import data.fintype
-import data.finset
-import tactic.basic
-import order.boolean_algebra
-import order.bounded_lattice
+--import data.finset
+--import tactic.basic
+--import order.boolean_algebra
+--import order.bounded_lattice
 
 namespace functional
 
 variables {α β : Type}
 
-section func
-
-inductive PC {Feature : Type} : Type
-| All  : PC 
-| None : PC
-| Atom : Feature → PC 
-| Not  : PC → PC
-| And  : PC → PC → PC
-| Or   : PC → PC → PC 
- 
-@[simp]
-def Config {Feature : Type} [fintype Feature] : finset Feature := 
-    finset.univ 
+section func 
 
 --instance fin_fin_power {α : Type} [t : fintype α]: fintype (finset (finset α)) :=
 --{ elems := finset.powerset (finset.univ.powerset) ,
@@ -32,31 +20,15 @@ def Config {Feature : Type} [fintype Feature] : finset Feature :=
 --    intros, apply finset.subset_univ, apply finset.mem_univ
 --  end}
 
-@[simp]
-def allConfigs {Feature : Type} [t1 : fintype Feature] : finset (finset Feature)
-    := finset.univ 
-
 --def allProducts := allConfigs Feature L
 
-open PC
+open variability 
 
---@[simp]
-def semantics {Feature : Type} [fintype Feature] [decidable_eq Feature]
-    : PC → finset (finset Feature)
-| (All) := allConfigs
-| (None):= ∅
-| (Atom f)      := allConfigs.filter (λ p, f ∈ p)
-| (Not pc)      := allConfigs.filter (λ p, p ∈ (semantics pc))
-| (And pc₁ pc₂) := (semantics pc₁) ∩ (semantics pc₂)
-| (Or  pc₁ pc₂) := (semantics pc₁) ∪ (semantics pc₂)
-
-structure Var {Feature: Type} [fintype Feature] {α : Type} := 
-    (v : α) (pc : @PC Feature)
+open variability.PC
 
 --@[simp]
 def disjoint {Feature : Type} [fintype Feature] [decidable_eq Feature]
-    (pc₁ : @PC Feature) (pc₂ : PC) : Prop :=
-    semantics (And pc₁ pc₂) = ∅ 
+    (pc₁ pc₂: @PC Feature) : Prop := ⟦And pc₁ pc₂⟧ = ∅ 
 
 lemma conj_preserves_disjoint {Feature : Type} [fintype Feature] [decidable_eq Feature] :
     ∀ (pc₁ : @PC Feature) (pc₂ : PC) (c : PC), disjoint pc₁ pc₂ → disjoint (And c pc₁) (And c pc₂) :=
@@ -75,21 +47,90 @@ lemma conj_preserves_disjoint {Feature : Type} [fintype Feature] [decidable_eq F
     end
 
 --@[simp]
-def disjointList {Feature : Type} [t : fintype Feature] [decidable_eq Feature] {α : Type}
-    (vs : list (@Var Feature t α)) : Prop :=
-    ∀ (x y : Var) , x ∈ vs → y ∈ vs → x.pc ≠ y.pc → disjoint x.pc y.pc
+def disjointList {Feature : Type} [t : fintype Feature] [decidable_eq Feature]
+    (vs : list (@PC Feature)) : Prop :=
+    ∀ (x y : PC) , x ∈ vs → y ∈ vs → x ≠ y → disjoint x y
 
-def cover {Feature : Type} [t : fintype Feature] [d : decidable_eq Feature] {α : Type}
-    (v : list (@Var Feature t α)) := 
-    semantics(list.foldr Or None (list.map (Var.pc) v))
+def cover {Feature : Type} [t : fintype Feature] [d : decidable_eq Feature]
+    (v : list (@PC Feature)) := 
+    semantics(list.foldr Or None v)
+
+/-
+lemma disj_cover {Feature : Type} [t : fintype Feature] [d : decidable_eq Feature] :
+    ∀ (l₁ l₂ : list (@PC Feature)) (x y : PC), 
+        x ∈ l₁ → y ∈ l₂ → cover l₁ ∩ cover l₂ = ∅ → disjoint x y :=
+begin
+    intros l₁ l₂ x y h₁ h₂ h₃, unfold disjoint, unfold semantics,
+    induction l₁,
+    simp at h₁, by_contradiction, exact h₁,
+    apply l₁_ih, simp at h₁,  
+end -/
+
+structure PCPartition {Feature: Type} [t : fintype Feature] [decidable_eq Feature] :=
+    (pcs  : list (@PC Feature))
+    (disj : disjointList pcs)
+    (comp : cover pcs = allConfigs)
+
+def getPC {Feature: Type} [t : fintype Feature] [d: decidable_eq Feature]
+    (c : @Config Feature t) : (list (@PC Feature)) → @PC Feature
+| [] := None
+| (x :: xs) := ite (c ∈ ⟦x⟧) x (getPC xs)
+
+def pRel {Feature: Type} [t : fintype Feature] [d: decidable_eq Feature] (p : @PCPartition Feature t d)
+    (c₁ : @Config Feature t) (c₂ : @Config Feature t) : Prop :=
+getPC c₁ p.pcs = getPC c₂ p.pcs
+
+lemma pRelReflexive {Feature: Type} [t : fintype Feature] [d: decidable_eq Feature] (p : @PCPartition Feature t d) :
+    ∀ (c : Config), pRel p c c :=
+begin
+    intros c, unfold pRel 
+end
+
+lemma pRelSymmetric {Feature: Type} [t : fintype Feature] [d: decidable_eq Feature] (p : @PCPartition Feature t d) :
+    symmetric (pRel p) :=
+begin
+    unfold symmetric, intros c₁ c₂ h, unfold pRel, unfold pRel at h, rw h 
+end
+
+lemma pRelTransitive {Feature: Type} [t : fintype Feature] [d: decidable_eq Feature] (p : @PCPartition Feature t d) :
+    ∀ (c₁ c₂ c₃: Config), pRel p c₁ c₂ → pRel p c₂ c₃ → pRel p c₁ c₃  :=
+begin
+    intros c₁ c₂ c₃ h₁ h₂, unfold pRel, unfold pRel at h₁, unfold pRel at h₂,
+    rw h₁, rw← h₂
+end
+ 
+lemma pRelEquiv {Feature: Type} [t : fintype Feature] [d: decidable_eq Feature] (p : @PCPartition Feature t d) :
+    equivalence (pRel p) :=
+⟨pRelReflexive p, ⟨pRelSymmetric p, pRelTransitive p⟩⟩
 
 structure Lifted {Feature: Type} [t : fintype Feature] [decidable_eq Feature] (α : Type) := 
     (s : list (@Var Feature t α))
+    (nonEmpty : ¬s.empty)
     (disj : disjointList s)
     (comp : cover s = allConfigs)
 
-notation `⟦` p `⟧` := (semantics p)
 postfix `↑`:(max+1) := Lifted
+
+
+--lemma exists_config {Feature: Type} [t : fintype Feature] [d : decidable_eq Feature] (α : Type) :
+--    ∀ (x : @Lifted Feature t d α) (c : @Config Feature t), ∃ (v : @Var Feature t α), v ∈ x.s → c ∈ ⟦v.pc⟧ :=
+--begin
+--    intros, 
+--end
+
+def index' {Feature: Type} [t : fintype Feature] [decidable_eq Feature] {α : Type}
+    (x : α↑) (c : Config) : list (@Var Feature t α) :=
+let xs := list.filter (λ (y : @Var Feature t α), c ∈ ⟦y.pc⟧) x.s in xs 
+
+#print equivalence
+lemma unique_index' {Feature: Type} [t : fintype Feature] [decidable_eq Feature] {α : Type} :
+    ∀ (x : α↑) (c : @Config Feature t), list.length (index' x c) = 1 :=
+begin
+    --intros x c, 
+    unfold index', simp, intros x c, 
+    -- base case
+    simp, apply x.nonEmpty,   
+end
 
 --@[simp]
 def apply_single {Feature : Type} [t: fintype Feature] [d: decidable_eq Feature] {α β : Type}
@@ -156,6 +197,29 @@ end
 def apply_inner {Feature : Type} [t: fintype Feature] [d: decidable_eq Feature] 
     (f : @Lifted Feature t d (α → β)) (v : @Lifted Feature t d α) : list (@Var Feature t β) :=
     list.foldr list.append [] (list.map (λ x, apply_single x v) f.s
+
+lemma disjoint_append {Feature : Type} [t: fintype Feature] [d: decidable_eq Feature] {α β : Type} :
+    ∀ (l₁ l₂ : list (@Var Feature t Feature)), cover l₁ ∩ cover l₂ = ∅ → disjointList l₁ → disjointList l₂ → disjointList (l₁ ++ l₂) :=
+begin
+    intros l₁ l₂ h₁ h₂ h₃,
+    unfold disjointList, intros x y h₄ h₅ h₆,
+    simp at h₄, simp at h₅, 
+    apply or.elim h₄,
+    -- assume x ∈ l₁
+    intro h₇, apply or.elim h₅, 
+    -- and assume y ∈ l₁
+    intro h₈, unfold disjointList at h₂,
+    apply h₂, exact h₇, exact h₈, exact h₆, 
+    -- now assume y ∈ l₂
+    intro h₈, 
+    -- base case
+    simp, exact h₃,
+    -- induction
+    simp, unfold disjointList, intros x y h₄ h₅ h₆,
+    simp at h₄, apply or.elim h₄,
+    -- case 1
+    intro h₇, 
+end
 
 lemma apply_inner_disjoint {Feature : Type} [t: fintype Feature] [d: decidable_eq Feature] {α β : Type} : 
     ∀ (f : @Lifted Feature t d (α → β)) (v : @Lifted Feature t d α),
