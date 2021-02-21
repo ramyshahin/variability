@@ -86,9 +86,20 @@ end --section
 def index {Feature: Type} [t : fintype Feature] [d : decidable_eq Feature] {α : Type}
     (v : @Lifted Feature t d α) (ρ : @Config Feature t) : α :=
 let pred := λ (u : @Var Feature t α) , ρ ∈ ⟦u.pc⟧,
-    e := find pred v.s,
-    p := (list_find pred v.s (v.comp ρ))
-in  (option.get p).v
+    r    := find pred v.s in 
+if  h : r.is_some 
+then (option.get h).v
+else false.elim 
+begin 
+    apply h, apply (list_find pred v.s (v.comp ρ))
+end
+
+lemma index_unique {Feature: Type} [t : fintype Feature] [d : decidable_eq Feature] {α : Type}
+    (v : @Lifted Feature t d α) (x : @Var Feature t α) (ρ : @Config Feature t)  
+    : x ∈ v.s → ρ ∈ ⟦ x.pc ⟧ → (index v ρ) = x.v :=
+begin
+    sorry
+end
 
 infix `|` := index
 
@@ -144,6 +155,9 @@ def apply {Feature : Type} [t: fintype Feature] [d: decidable_eq Feature] {α β
 
 theorem apply_correct {Feature : Type} [t: fintype Feature] [d: decidable_eq Feature] (α β : Type) :
     ∀ (f : @Lifted Feature t d (α → β)) (v : @Lifted Feature t d α) (ρ : @Config Feature t),
-    (apply f v) | ρ = (f | ρ) (v | ρ) :=
+    index (apply f v) ρ = (index f ρ) (index v ρ) :=
+begin
+    intros f v ρ, 
+end
 
 end variability
