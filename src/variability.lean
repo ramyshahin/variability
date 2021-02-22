@@ -93,13 +93,17 @@ else false.elim
 begin 
     apply h, apply (list_find pred v.s (v.comp ρ))
 end
-
+#print option.get_of_mem
+ 
 lemma index_unique {Feature: Type} [t : fintype Feature] [d : decidable_eq Feature] {α : Type}
     (v : @Lifted Feature t d α) (x : @Var Feature t α) (ρ : @Config Feature t)  
     : x ∈ v.s → ρ ∈ ⟦ x.pc ⟧ → (index v ρ) = x.v :=
 begin
-    sorry
+    --intros h1 h2, 
+    unfold index, simp, split_ifs, 
+    {intros h1 h2, rw option.get_of_mem, simp,  }
 end
+#print list.find_mem 
 
 infix `|` := index
 

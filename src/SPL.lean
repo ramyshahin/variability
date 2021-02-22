@@ -5,17 +5,45 @@ import data.finset
 
 namespace SPL
 
-variables {Feature : Type}
-variables [d : decidable_eq Feature]
-variables [t : fintype Feature] 
+-- Features and Configurations
+section 
+parameters (Feature : Type) [fintype Feature] [decidable_eq Feature]
 
-def Config : Type := finset Feature
+@[reducible]
+def Config : Type := finset Feature  
 
-instance Config_has_mem : has_mem Feature Config := finset.has_mem
+@[reducible]
+def ConfigSpace : Type := finset (finset Feature) 
 
-structure SPL :=
-    (features : finset Feature)
-    (allFeatures : finset Feature := fintype.elems Feature)
-    (allConfigs : finset Config := allFeatures.powerset)
+end -- Features and Configurations section
+
+-- Presence Conditions (PCs)
+section 
+parameters {Feature : Type} [fintype Feature] [decidable_eq Feature]
+
+@[reducible]
+def allConfigs : ConfigSpace Feature := finset.univ
+
+inductive PC : Type
+| All  : PC 
+| None : PC
+| Atom : Feature → PC 
+| Not  : PC → PC
+| And  : PC → PC → PC
+| Or   : PC → PC → PC
+
+open PC list
+
+def semantics : PC → ConfigSpace Feature
+| (All)         := allConfigs
+| (None)        := ∅
+| (Atom f)      := allConfigs.filter (λ p, f ∈ p)
+| (Not pc)      := allConfigs.filter (λ p, p ∈ (semantics pc))
+| (And pc₁ pc₂) := (semantics pc₁) ∩ (semantics pc₂)
+| (Or  pc₁ pc₂) := (semantics pc₁) ∪ (semantics pc₂)
+
+end -- section PCs
+
+notation `⟦` p `⟧` := (semantics p)
 
 end SPL
