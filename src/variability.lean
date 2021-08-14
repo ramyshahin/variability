@@ -1,26 +1,30 @@
 import data.finset
+import data.setoid.partition
 
 namespace variability
 
-@[simp]
-def Config {Feature : Type} [fintype Feature] := finset Feature  
+section 
+
+parameters {Features : Type} [decidable_eq Features] [fintype Features]
+variables  {α :Type}
+
+@[reducible]
+def Config : Type := finset Features
 
 @[simp]
-def allConfigs {Feature : Type} [t1 : fintype Feature] : finset (finset Feature)
-    := finset.univ 
+def allConfigs : finset Config := finset.univ
 
-inductive PC {Feature : Type} : Type
+inductive PC : Type
 | All  : PC 
 | None : PC
-| Atom : Feature → PC 
+| Atom : Features → PC 
 | Not  : PC → PC
 | And  : PC → PC → PC
 | Or   : PC → PC → PC
 
 open PC list 
 
-def semantics {Feature : Type} [t : fintype Feature] [decidable_eq Feature]
-    : PC → finset (@Config Feature t)
+def semantics : PC → finset Config
 | (All)         := allConfigs
 | (None)        := ∅
 | (Atom f)      := allConfigs.filter (λ p, f ∈ p)
@@ -28,10 +32,14 @@ def semantics {Feature : Type} [t : fintype Feature] [decidable_eq Feature]
 | (And pc₁ pc₂) := (semantics pc₁) ∩ (semantics pc₂)
 | (Or  pc₁ pc₂) := (semantics pc₁) ∪ (semantics pc₂)
 
-notation `⟦` p `⟧` := (semantics p)
+local notation `⟦` p `⟧` := semantics p
+#print finset.map
+-- configuration partition
+structure ConfigPartition := 
+ (pcs: finset PC) (p: setoid.indexed_partition semantics)
 
-structure Var {Feature: Type} [fintype Feature] (α : Type) := 
-    (v : α) (pc : @PC Feature)
+-- annotated value (AVal)
+structure AVal := (v : α) (pc : PC)
 
 /-
 def cover {Feature : Type} [t : fintype Feature] [d : decidable_eq Feature] {α : Type}
@@ -43,21 +51,19 @@ inductive disjointVars {Feature : Type} [t : fintype Feature] [d : decidable_eq 
 | cons_disjoint : ∀ (x : @Var Feature t α) (xs: list (@Var Feature t α)), ⟦x.pc⟧ ∩ cover xs = ∅ → disjointVars (x :: xs)
 -/
 
-def disjointPCs {Feature: Type} [t : fintype Feature] [decidable_eq Feature] {α : Type}
-    (s    : list (@Var Feature t α)) : Prop := 
-    ∀ (c : Config) (pc₁ pc₂ : PC), pc₁ ∈ map (Var.pc) s → pc₂ ∈ map (Var.pc) s → 
-                                           c ∈ ⟦pc₁⟧ → c ∈ ⟦pc₂⟧ → pc₁ = pc₂
+def disjointPCs {α : Type} (s: list (@AVal α)) : Prop := 
+    ∀ (c : Config) (pc₁ pc₂ : PC), pc₁ ∈ map (AVal.pc) s → pc₂ ∈ map (AVal.pc) s → 
+                                   c ∈ semantics pc₁ → c ∈ semantics pc₂ → pc₁ = pc₂
 
-def completePCs {Feature: Type} [t : fintype Feature] [decidable_eq Feature] {α : Type} 
-    (s    : list (@Var Feature t α)) : Prop :=
-    ∀ (c : Config), ∃ (v : Var α), v ∈ s ∧ c ∈ ⟦v.pc⟧
+def completePCs {α : Type} (s: list (@AVal α)) : Prop :=
+    ∀ (c : Config), ∃ (v : AVal), v ∈ s ∧ c ∈ semantics v.pc
 
-structure Lifted {Feature: Type} [t : fintype Feature] [decidable_eq Feature] {α : Type} :=
-    (s    : list (@Var Feature t α))
+structure Var {α : Type} :=
+    (s    : list (@AVal α))
     (disj : disjointPCs s) 
     (comp : completePCs s)
 
-postfix `↑`:(max+1) := Lifted
+--postfix `↑`:(max+1) := Var
 
 section 
 
@@ -83,9 +89,8 @@ end
 
 end --section
 
-def index {Feature: Type} [t : fintype Feature] [d : decidable_eq Feature] {α : Type}
-    (v : @Lifted Feature t d α) (ρ : @Config Feature t) : α :=
-let pred := λ (u : @Var Feature t α) , ρ ∈ ⟦u.pc⟧,
+def index {α : Type} (v : Var) (ρ : Config) : α :=
+let pred := λ (u : @AVal α) , ρ ∈ semantics u.pc,
     r    := find pred v.s in 
 if  h : r.is_some 
 then (option.get h).v
@@ -93,15 +98,13 @@ else false.elim
 begin 
     apply h, apply (list_find pred v.s (v.comp ρ))
 end
-#print option.get_of_mem
  
-lemma index_unique {Feature: Type} [t : fintype Feature] [d : decidable_eq Feature] {α : Type}
-    (v : @Lifted Feature t d α) (x : @Var Feature t α) (ρ : @Config Feature t)  
-    : x ∈ v.s → ρ ∈ ⟦ x.pc ⟧ → (index v ρ) = x.v :=
+lemma index_unique {α : Type} (l1 : @Var α) (x : @AVal α) (ρ : Config)  
+    : x ∈ l.s → ρ ∈ semantics x.pc → (index l ρ) = x.v :=
 begin
-    --intros h1 h2, 
+    intros h1 h2, 
     unfold index, simp, split_ifs, 
-    {intros h1 h2, rw option.get_of_mem, simp,  }
+    {rw option.get_of_mem, simp,  }
 end
 #print list.find_mem 
 
@@ -163,5 +166,7 @@ theorem apply_correct {Feature : Type} [t: fintype Feature] [d: decidable_eq Fea
 begin
     intros f v ρ, 
 end
+
+end section
 
 end variability
