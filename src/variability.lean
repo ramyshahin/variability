@@ -34,7 +34,7 @@ def semantics : PC → finset Config
 
 local notation `⟦` p `⟧` := semantics p
 
--- configuration partition
+-- configuration partition ConfigPartition
 def ConfigPartition := indexed_partition (λ pc, {x | x ∈ ⟦pc⟧})
 
 -- annotated value (AVal)
