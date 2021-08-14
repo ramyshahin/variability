@@ -33,10 +33,9 @@ def semantics : PC → finset Config
 | (Or  pc₁ pc₂) := (semantics pc₁) ∪ (semantics pc₂)
 
 local notation `⟦` p `⟧` := semantics p
-#print finset.map
+
 -- configuration partition
-structure ConfigPartition := 
- (pcs: finset PC) (p: setoid.indexed_partition semantics)
+def ConfigPartition := indexed_partition (λ pc, {x | x ∈ ⟦pc⟧})
 
 -- annotated value (AVal)
 structure AVal := (v : α) (pc : PC)
