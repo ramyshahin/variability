@@ -1,4 +1,4 @@
-import data.finset
+import data.finset data.set tactic
 import data.setoid.partition
 
 namespace variability
@@ -6,40 +6,192 @@ namespace variability
 section 
 
 parameters {Features : Type} [decidable_eq Features] [fintype Features]
-variables  {α :Type}
+--variables  {α :Type} -- [subsingleton α] -- TODO: why subsingleton?
+
+inductive FeatureExpr
+| All  : FeatureExpr 
+| None : FeatureExpr
+| Atom : Features → FeatureExpr 
+| Not  : FeatureExpr → FeatureExpr
+| And  : FeatureExpr → FeatureExpr → FeatureExpr
+| Or   : FeatureExpr → FeatureExpr → FeatureExpr
+
+open FeatureExpr
+def featExpr_to_string [has_to_string Features] : FeatureExpr → string
+| All  := "Universe"
+| None := "∅"
+| (Atom f) := to_string f
+| (Not p) := "¬" ++ featExpr_to_string p
+| (And p q) := (featExpr_to_string p) ++ " ∧ " ++ (featExpr_to_string q)
+| (Or p q)  := (featExpr_to_string p) ++ " ∨ " ++ (featExpr_to_string q)
+      
+instance [has_to_string Features] : has_to_string FeatureExpr := ⟨featExpr_to_string⟩
+
+instance [has_to_string Features] : has_repr FeatureExpr := ⟨to_string⟩
+
+--@[reducible]
+def Config: Type := finset Features
 
 @[reducible]
-def Config : Type := finset Features
+def ConfigSpace: Type := finset (finset Features) --:= finset.univ
 
-@[simp]
-def allConfigs : finset Config := finset.univ
-
-inductive PC : Type
-| All  : PC 
-| None : PC
-| Atom : Features → PC 
-| Not  : PC → PC
-| And  : PC → PC → PC
-| Or   : PC → PC → PC
-
-open PC list 
-
-def semantics : PC → finset Config
-| (All)         := allConfigs
+open FeatureExpr
+def semantics: FeatureExpr → finset Config
+| (All)         := finset.univ
 | (None)        := ∅
-| (Atom f)      := allConfigs.filter (λ p, f ∈ p)
-| (Not pc)      := allConfigs.filter (λ p, p ∈ (semantics pc))
+| (Atom f)      := {x: Config | f ∈ x} --ConfigSpace.filter (λx, f ∈ x)
+| (Not pc)      := ConfigSpace \ (semantics pc)
 | (And pc₁ pc₂) := (semantics pc₁) ∩ (semantics pc₂)
 | (Or  pc₁ pc₂) := (semantics pc₁) ∪ (semantics pc₂)
 
-local notation `⟦` p `⟧` := semantics p
+local notation `⦃` p `⦄` := semantics p
 
+instance : has_equiv FeatureExpr :=
+⟨λ x y, eq ⦃x⦄ ⦃y⦄⟩
+
+def PC := FeatureExpr
+
+end --section
+
+section
+
+parameters {F: Type} [d: decidable_eq F] [ft: fintype F]
+
+def Conf : Type := @Config F d ft
+def ConfigSet : Type := finset Conf -- d ft)
+
+structure SPL :=
+(Features: Type)
+--(Φ: @FeatureExpr Features)
+
+open list
+
+def PCond := @PC F d ft
+
+-- decision procedure for list disjointness
+@[simp]
+def checkDisj {β : Type} [decidable_eq β]: list (finset β) → bool
+| ([]) := true
+| (x :: xs) := band (checkDisj xs) (∀ y ∈ xs, x ∩ y = ∅)
+
+@[simp]
+def checkTotal (cs : list (finset Conf)) : bool :=
+    foldl (∪) ∅ cs = @ConfigSpace F d ft
+
+def C := @Config F d ft
+def l {C : Type} := @lift_t (finset C) (set C)
+
+def m (p : @PC F d ft) : set (@Config F d ft) := ↑(semantics p)
+
+--@[derive [decidable_eq]] 
+
+structure ConfigPartition :=
+(pcs : list PCond)
+(cs  : finset (finset Conf) := (to_finset (list.map (semantics) pcs)))
+(inv : ∀ (c: Conf), ∃! b ∈ cs, c ∈ b . tactic.exact_dec_trivial)
+
+lemma partition_inv : 
+    ∀ (cs : list (finset Conf)), checkDisj cs ∧ checkTotal cs ↔ ∀ (c: @ConfigSpace F d ft), ∃! b ∈ cs, c ∈ b :=
+begin
+    intros, split, induction cs,
+      -- base case
+      intros H c, simp at H, simp,
+end
+
+--(disj: checkDisj (list.map semantics (pcs)) . tactic.exact_dec_trivial) --disjPCs pcs)
+--(total : checkTotal pcs . tactic.exact_dec_trivial)
+
+--instance {α : Type} : has_lift_t (finset (finset α)) (set (set α)) :=
+--⟨λ x, let y := finset.image ((λy, ↑y) : finset α → set α) x in y⟩ --{z:α | z ∈ y}}⟩
+--def partition_to_setoid (cp : ConfigPartition) : setoid (@Config F d ft) :=
+--setoid.mk_classes ↑(cp.cs) cp.inv 
+
+structure Var {α : Type} :=
+(p : ConfigPartition)
+(vs : list α)
+(inv : vs.length = p.pcs.length . tactic.exact_dec_trivial)
+
+open list
 -- configuration partition: ConfigPartition
-def ConfigPartition := indexed_partition (λ pc, {x | x ∈ ⟦pc⟧})
+--def ConfigPartition := indexed_partition (λ pc, {x | x ∈ ⦃pc⦄}) 
 
--- annotated value (AVal)
-structure AVal := (v : α) (pc : PC)
+inductive disjPCs : list PC → Prop
+| disjPCs_nil : disjPCs []
+| disjPCs_cons {x : PC} {xs : list PC} : disjPCs xs → (∀ y, y ∈ xs → ⦃x⦄ ∩ ⦃y⦄ = ∅) → disjPCs (x :: xs)
 
+instance [has_to_string Features] : has_to_string ConfigPartition :=
+    ⟨λ p, list.to_string p.pcs⟩
+
+instance [has_to_string Features]: has_repr ConfigPartition := ⟨to_string⟩
+
+def is_eqv (p : ConfigPartition) (ρ₁ ρ₂ : Config) : bool :=
+let idx := λ ρ, list.find (λ x, ρ ∈ ⦃x⦄) p.pcs
+in  idx ρ₁ = idx ρ₂
+
+local infix `~` := is_eqv
+
+lemma checkDisj_correct :
+    ∀ (pcs : list PC), disjPCs pcs ↔ (checkDisj (map semantics pcs) = tt) :=
+begin
+    intros, split, 
+    -- → 
+    intro h, induction h,
+      -- base case
+      simp,
+      -- induction
+      simp, split,
+        -- lhs
+        apply h_ih, 
+        -- rhs
+        apply h_ᾰ_1, 
+    -- ←
+    intro h, induction pcs,
+      -- base case
+      apply disjPCs.disjPCs_nil,
+      -- induction
+      apply disjPCs.disjPCs_cons,
+        apply pcs_ih, unfold map at h, simp at h, apply h.left,
+        intros y h₂, simp at h, apply h.right, apply h₂
+end
+
+
+
+-- lifted value
+structure Var := 
+    (elems: list (α × PC))
+    (disj: checkDisj (map semantics (map prod.snd elems)) . tactic.exact_dec_trivial) --disjPCs pcs)
+    (total : checkTotal (map prod.snd elems) . tactic.exact_dec_trivial)
+
+instance {α : Type} [has_to_string (α × PC)]: has_to_string (@Var α) :=
+    ⟨λ v, list.to_string v.elems⟩
+
+instance {α : Type} [has_to_string (α × PC)]: has_repr (@Var α) := ⟨to_string⟩
+
+local postfix `↑`:(max+1) := Var
+
+/-
+def index (v : Var) (ρ : Config) : α :=
+let pred := λ (u : α × PC) , ρ ∈ semantics u.2,
+    r    := find pred v.elems in 
+if  h : r.is_some 
+then (option.get h).1
+else false.elim 
+begin 
+    apply h, apply (list_find pred v.s (v.comp ρ))
+end
+-/
+
+def index' (ρ : Config) : list (α × PC) → option α
+| [] := none
+| (x :: xs) := if ρ ∈ ⦃x.2⦄ then some x.1 else index' xs 
+
+def index (ρ : Config) (v : Var) : option α := 
+    index' ρ v.elems
+
+end section
+
+end namespace variability
+/-
 /-
 def cover {Feature : Type} [t : fintype Feature] [d : decidable_eq Feature] {α : Type}
     (v : list (@Var Feature t α)) : finset Config := 
@@ -62,7 +214,7 @@ structure Var {α : Type} :=
     (disj : disjointPCs s) 
     (comp : completePCs s)
 
---postfix `↑`:(max+1) := Var
+
 
 section 
 
@@ -88,15 +240,7 @@ end
 
 end --section
 
-def index {α : Type} (v : Var) (ρ : Config) : α :=
-let pred := λ (u : @AVal α) , ρ ∈ semantics u.pc,
-    r    := find pred v.s in 
-if  h : r.is_some 
-then (option.get h).v
-else false.elim 
-begin 
-    apply h, apply (list_find pred v.s (v.comp ρ))
-end
+
  
 lemma index_unique {α : Type} (l1 : @Var α) (x : @AVal α) (ρ : Config)  
     : x ∈ l.s → ρ ∈ semantics x.pc → (index l ρ) = x.v :=
@@ -165,7 +309,4 @@ theorem apply_correct {Feature : Type} [t: fintype Feature] [d: decidable_eq Fea
 begin
     intros f v ρ, 
 end
-
-end section
-
-end variability
+-/
