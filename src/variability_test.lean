@@ -5,47 +5,29 @@ import .variability
 
 open variability
 
--- the auto-derive works only when data.set and tactic are imported
-@[derive [fintype, decidable_eq]] inductive Features 
-| Feat_A
-| Feat_B
-| Feat_C
+def FA: Feature := @fin.mk n 0 (begin rw n, simp end)
+def FB: Feature := @fin.mk n 1 (begin rw n, simp end)
+def FC: Feature := @fin.mk n 2 (begin rw n, simp end)
 
-open Features
-instance : has_to_string Features :=
-⟨λ f, match f with
-      | Feat_A := "Feat_A"
-      | Feat_B := "Feat_B"
-      | Feat_C := "Feat_C"
-      end⟩
-
-instance : has_repr Features := ⟨to_string⟩
-
-def T : Type := finset Features
-def x : T := {Feat_A}
-
-def p : SPL := ⟨Features⟩
-
-def pc₁ : PC := FeatureExpr.Atom Features.Feat_A
+def pc₁ : PC := (FeatureExpr.Atom FA)
 def pc₂ : PC := FeatureExpr.Not pc₁
-def pc₃ := FeatureExpr.Atom Feat_B
+def pc₃ := (FeatureExpr.Atom FB)
 def pc₄ := FeatureExpr.And pc₁ pc₃
 def pc₅ := FeatureExpr.Or pc₁ pc₂
 
-def s₁ := semantics pc₁
-def s₂ := semantics pc₂
-
+def s₁ := ⦃pc₁⦄
+def s₂ := ⦃pc₂⦄
 
 #eval s₁
 #eval s₂
 
 open setoid
 
-#eval (semantics pc₄)
-#eval (semantics pc₅)
+#eval ⦃pc₄⦄
+#eval ⦃pc₅⦄
 
 #eval (checkDisj (list.map semantics [pc₁, pc₂]))
-#eval (checkTotal [pc₁, pc₂])
+#eval (checkTotal (list.map semantics [pc₁, pc₂]))
 def p₁ : ConfigPartition := {ConfigPartition . pcs := [pc₁, pc₂]}
 
 #eval (checkDisj (list.map semantics [pc₁, pc₃]))
