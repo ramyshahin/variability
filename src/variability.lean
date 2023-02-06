@@ -88,8 +88,9 @@ lemma hl2: has_lift_t (finset (finset Config)) (set (set Config)) :=
 
 structure ConfigPartition :=
 (pcs : list PC)
-(cs  : set (set Config) := ↑(to_finset(list.map (((@lift_t (finset Config) (set Config) hl1) ∘ semantics)) pcs)))
-(inv : ∀ (c: Config), ∃! b ∈ cs, c ∈ b . tactic.exact_dec_trivial)
+(cs  : list (finset Config) := (list.map semantics pcs))
+(inv: checkDisj(cs) ∧ checkTotal(cs) . tactic.exact_dec_trivial)
+--(inv : ∀ (c: Config), ∃! b ∈ cs, c ∈ b . tactic.exact_dec_trivial)
 
 --lemma partition_inv : 
 --    ∀ (cs : list (finset Conf)), checkDisj cs ∧ checkTotal cs ↔ ∀ (c: @ConfigSpace F d ft), ∃! b ∈ cs, c ∈ b :=
@@ -103,7 +104,7 @@ structure ConfigPartition :=
 --(total : checkTotal pcs . tactic.exact_dec_trivial)
 
 def partition_to_setoid (cp : ConfigPartition) : setoid Config :=
-setoid.mk_classes (cp.cs) (cp.inv)
+setoid.mk_classes (↑cp.cs) (cp.inv)
 
 structure Var {α : Type} :=
 (p : ConfigPartition)

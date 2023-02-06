@@ -31,7 +31,7 @@ open setoid
 def p₁ : ConfigPartition := {ConfigPartition . pcs := [pc₁, pc₂]}
 
 #eval (checkDisj (list.map semantics [pc₁, pc₃]))
-#eval (checkTotal [pc₁, pc₃])
+#eval (checkTotal (list.map semantics [pc₁, pc₃]))
 
 
 -- should fail
