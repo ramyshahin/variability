@@ -15,6 +15,7 @@ constant GSNEl : Type
 
 def Sys : Type := set SysEl
 
+@[reducible]
 def GSN : Type := set GSNEl
 
 @[reducible]
@@ -42,7 +43,7 @@ def createAnnotation    (g : GSN)
     let ch := image (λ e, (e, Annotation.Recheck)) recheck,
         rv := image (λ e, (e, Annotation.Revise)) revise,
         ru := image (λ e, (e, Annotation.Reuse)) 
-                    (g - (recheck ∪ revise))
+                    (g \ (recheck ∪ revise))
     in  ch ∪ rv ∪ ru
 
 open Delta
