@@ -37,16 +37,17 @@ def p₁ : ConfigPartition := {ConfigPartition . pcs := [pc₁, pc₂]}
 -- should fail
 --def p₁ : ConfigPartition := {ConfigPartition . pcs := [pc₁, pc₃]}
 
-def v₁ : Var := Var.mk [(7,pc₁), (3,pc₂)]
+
+def v₁ : Var := Var.mk p₁ [7, 3]
 #eval v₁
 
-#eval index {Feat_B} v₁
-#eval index {Feat_C} v₁
-#eval index {Feat_A} v₁
+#eval index {FB} v₁
+#eval index {FC} v₁
+#eval index {FA} v₁
 
 -- should fail
---def v₂ : Var := Var.mk [(7,pc₁), (3,pc₃)]
+--def v₂ : Var := Var.mk {ConfigPartition . pcs := [pc₁, pc₃]} [7, 3]
 
 #eval p₁
-#eval (to_bool (is_eqv p₁ {Feat_B} {Feat_C}))
-#eval (is_eqv p₁ {Feat_B} {Feat_A})
+#eval (to_bool (is_eqv p₁ {FB} {FC}))
+#eval (is_eqv p₁ {FB} {FA})

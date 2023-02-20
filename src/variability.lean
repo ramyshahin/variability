@@ -10,6 +10,7 @@ def n := 3
 @[simp, reducible]
 def Feature := fin n
 
+@[derive decidable_eq]
 inductive FeatureExpr
 | All  : FeatureExpr 
 | None : FeatureExpr
@@ -30,6 +31,7 @@ def featExpr_to_string  : FeatureExpr → string
 instance: has_to_string FeatureExpr := ⟨featExpr_to_string⟩
 
 instance [has_to_string Feature] : has_repr FeatureExpr := ⟨to_string⟩
+
 --#print has_lift_t 
 @[reducible, simp] --, derive (has_lift (finset Feature) (set Feature))] 
 def Config: Type := finset Feature
@@ -52,6 +54,8 @@ instance : has_equiv FeatureExpr :=
 ⟨λ x y, eq ⦃x⦄ ⦃y⦄⟩
 
 def PC := FeatureExpr
+
+instance: has_to_string PC := ⟨featExpr_to_string⟩
 
 structure SPL :=
 (Features: Type)
@@ -103,13 +107,13 @@ structure ConfigPartition :=
 --(disj: checkDisj (list.map semantics (pcs)) . tactic.exact_dec_trivial) --disjPCs pcs)
 --(total : checkTotal pcs . tactic.exact_dec_trivial)
 
-def partition_to_setoid (cp : ConfigPartition) : setoid Config :=
-setoid.mk_classes (↑cp.cs) (cp.inv)
+--def partition_to_setoid (cp : ConfigPartition) : setoid Config :=
+--setoid.mk_classes (↑cp.cs) (cp.inv)
 
 structure Var {α : Type} :=
-(p : ConfigPartition)
-(vs : list α)
-(inv : vs.length = p.pcs.length . tactic.exact_dec_trivial)
+(p      : ConfigPartition)
+(elems  : list α)
+(inv    : elems.length = p.pcs.length . tactic.exact_dec_trivial)
 
 --open list
 -- configuration partition: ConfigPartition
@@ -119,16 +123,16 @@ inductive disjPCs : list PC → Prop
 | disjPCs_nil : disjPCs []
 | disjPCs_cons {x : PC} {xs : list PC} : disjPCs xs → (∀ y, y ∈ xs → ⦃x⦄ ∩ ⦃y⦄ = ∅) → disjPCs (x :: xs)
 
---instance [has_to_string Features] : has_to_string ConfigPartition :=
---    ⟨λ p, list.to_string p.pcs⟩
+instance: has_to_string ConfigPartition :=
+    ⟨λ p, list.to_string p.pcs⟩
 
---instance [has_to_string Features]: has_repr ConfigPartition := ⟨to_string⟩
+instance: has_repr ConfigPartition := ⟨to_string⟩
 
---def is_eqv (p : ConfigPartition) (ρ₁ ρ₂ : Config) : bool :=
---let idx := λ ρ, list.find (λ x, ρ ∈ ⦃x⦄) p.pcs
---in  idx ρ₁ = idx ρ₂
+def is_eqv (p : ConfigPartition) (ρ₁ ρ₂ : Config) : bool :=
+let idx := λ ρ, list.find (λ x, ρ ∈ ⦃x⦄) p.pcs
+in  idx ρ₁ = idx ρ₂
 
---local infix `~` := is_eqv
+local infix `~` := is_eqv
 /-
 lemma checkDisj_correct :
     ∀ (pcs : list PC), disjPCs pcs ↔ (checkDisj (map semantics pcs) = tt) :=
@@ -177,25 +181,14 @@ local postfix `↑`:(max+1) := Var
 -/
 end LiftedVals 
 
-/-
-def index (v : Var) (ρ : Config) : α :=
-let pred := λ (u : α × PC) , ρ ∈ semantics u.2,
-    r    := find pred v.elems in 
-if  h : r.is_some 
-then (option.get h).1
-else false.elim 
-begin 
-    apply h, apply (list_find pred v.s (v.comp ρ))
-end
--/
-/-
-def index' (ρ : Config) : list (α × PC) → option α
+def index' {α:Type} (ρ : Config) : list (α × PC) → option α
 | [] := none
 | (x :: xs) := if ρ ∈ ⦃x.2⦄ then some x.1 else index' xs 
 
-def index (ρ : Config) (v : Var) : option α := 
-    index' ρ v.elems
--/
+def index {α:Type} (ρ : Config) (v : @Var α) : option α := 
+    index' ρ (list.zip v.elems v.p.pcs)
+
+infix `|` := index
 
 /-
 /-
@@ -256,8 +249,6 @@ begin
     {rw option.get_of_mem, simp,  }
 end
 #print list.find_mem 
-
-infix `|` := index
 
 /-
 def PCPartition {Feature: Type} [t : fintype Feature] [d: decidable_eq Feature] {α : Type} 
