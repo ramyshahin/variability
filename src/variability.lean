@@ -110,7 +110,7 @@ structure ConfigPartition :=
 --def partition_to_setoid (cp : ConfigPartition) : setoid Config :=
 --setoid.mk_classes (↑cp.cs) (cp.inv)
 
-structure Var {α : Type} :=
+structure Var (α : Type) :=
 (p      : ConfigPartition)
 (elems  : list α)
 (inv    : elems.length = p.pcs.length . tactic.exact_dec_trivial)

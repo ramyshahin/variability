@@ -1,9 +1,9 @@
 -- liftedCIA: Variability-aware Change Impact Assessment
 import .cia
-import .variability
+import .liftedSet
 
 open CIA
-open variability 
+open liftedSet 
 
 namespace liftedCIA
 
@@ -14,9 +14,10 @@ def GSNEl' := Var GSNEl
 def Sys' : Type := set' SysEl
 def GSN' : Type := set' GSNEl
 
+@[derive has_mem (SysEl × GSNEl)]
 def TraceRel' := set' (SysEl × GSNEl)
 
-open variability.has_index
+--instance: has_mem (SysEl × GSNEl ) TraceRel' := liftedSet.liftedSet_has_mem
 
 def indexTraceRel (t: TraceRel') (pc : PC) : set (SysEl × GSNEl) := 
     index t pc
@@ -24,12 +25,16 @@ def indexTraceRel (t: TraceRel') (pc : PC) : set (SysEl × GSNEl) :=
 instance TraceRel_has_index : has_index TraceRel' :=
 ⟨ indexTraceRel ⟩
 
+variable sliceSys   (s : Sys)  (es : set SysEl) : Sys
+variable sliceGSN_V (ac : GSN) (es : set GSNEl) : GSN
+variable sliceGSN_R (ac : GSN) (es : set GSNEl) : GSN
+
 constant sliceSys'   (s : Sys')  (es : set' SysEl) : Sys'
 constant sliceGSN_V' (ac : GSN') (es : set' GSNEl) : GSN'
 constant sliceGSN_R' (ac : GSN') (es : set' GSNEl) : GSN'
 
 axiom sliceSys_correct : ∀ (s : Sys')  (es : set' SysEl) (pc : PC),
-index (sliceSys' s es) pc = sliceSys (index s pc) (index es pc)
+index (sliceSys' s es) pc = (sliceSys (index s pc) (index es pc))
 
 axiom sliceGSNV_correct : ∀ (ac : GSN')  (es : set' GSNEl) (pc : PC),
 index (sliceGSN_V' ac es) pc = sliceGSN_V (index ac pc) (index es pc)
@@ -38,9 +43,7 @@ axiom sliceGSNR_correct : ∀ (ac : GSN')  (es : set' GSNEl) (pc : PC),
 index (sliceGSN_R' ac es) pc = sliceGSN_R (index ac pc) (index es pc)
 
 structure Delta' :=
-mk :: (add : set' SysEl) (delete : set' SysEl) (modify : set' SysEl)
-
-open variability.has_index
+(add : set' SysEl) (delete : set' SysEl) (modify : set' SysEl)
 
 def indexDelta (d : Delta') (pc : PC) :=
     let a := index d.add pc,
@@ -53,22 +56,18 @@ instance Delta_has_index : has_index Delta' :=
 
 def restrict' (t : TraceRel') (d : Delta') : TraceRel' :=
     let relevant := d.add ∪ d.delete ∪ d.modify
-    in  λ x, t x ∧ relevant x.1 
+    in  {x | x ∈ t ∧ x.1 ∈ relevant} 
 
 theorem restrict_correct : ∀ (pc : PC) (t : TraceRel') (d : Delta'), 
     index (restrict' t d) pc = restrict (index t pc) (indexDelta d pc)
     :=
 begin
-    intros, 
-    rw restrict, rw indexDelta, simp,
-    repeat {rw index}, repeat {rw function.comp},
-    unfold has_mem.mem, unfold set.mem,
-    apply funext, intros, 
-    repeat {rw ←and_or_distrib_left}, rw ←and_assoc, rw ←and_comm pc,
-    rw ←and_assoc, rw and_self pc, rw and_assoc, rw ←and.rotate,
-    rw restrict', simp, rw ←and_assoc, rw and_comm pc,
-    unfold has_union.union, repeat {rw variability.union}, simp, 
-    rw and_assoc 
+    intros, rw restrict', rw indexDelta, simp, rw restrict, rw allElements, simp,
+    apply funext, intros, repeat {rw set_of}, repeat {rw index_union},
+    repeat {rw index_mem}, rw index, repeat {rw function.comp}, simp,
+    rw and_comm _ pc, rw and_comm _ pc, rw and_assoc, rw← and_assoc (x ∈ t), 
+    rw← and_assoc _ (x ∈ t ∧ pc), rw and_comm _ (x ∈ t ∧ pc), simp, rw and_comm _ pc,
+    rw← and_assoc 
 end
 
 def trace' (t : TraceRel') (es : set' SysEl) : set' GSNEl :=
@@ -78,15 +77,12 @@ theorem trace_correct : ∀ (t : TraceRel') (es : set' SysEl) (pc : PC),
     index (trace' t es) pc = trace (index t pc) (index es pc)
     :=
 begin
-    intros, repeat {rw index}, repeat {rw function.comp},
-    rw trace', rw CIA.trace, simp, funext, simp, 
-    unfold has_mem.mem, rw ←exists_and_distrib_left, split,
-        intro h, cases h with x h₁, existsi x, repeat {rw set.mem}, 
-            rw and.left_comm, rw and.assoc, rw ←and.assoc, rw and_self, 
-            apply h₁,
-        intro h, cases h with x h₁, existsi x, repeat {rw set.mem at h₁},
-            rw and.left_comm at h₁, rw and.assoc at h₁, rw ←and.assoc at h₁,
-            rw and_self at h₁, exact h₁ 
+    intros, rw trace', rw index, rw function.comp, rw CIA.trace, simp, unfold set.image,
+    rw set_of,  simp, apply funext, intros, simp, split,
+    { intros h, apply exists.elim h.2, intros a g, existsi a, repeat {rw index_mem}, split,
+      split, exact g.2, exact h.1, split, exact g.1, exact h.1},
+    { intros h, apply exists.elim h, intros a g, repeat {rw index_mem at g}, split,
+      exact g.1.2, existsi a, split, exact g.2.1, exact g.1.1}
 end
 
 def createAnnotation'   (g : GSN') 
@@ -104,10 +100,18 @@ theorem createAnnotation_correct:
     createAnnotation (index g pc) (index recheck pc) (index revise pc)
     :=  
 begin
-    intros, repeat {rw index}, repeat {rw function.comp},
+    intros, unfold createAnnotation', repeat {rw image},
+    simp, unfold createAnnotation, repeat {rw set.image}, simp,
+    rw index, repeat {rw function.comp}, repeat {rw set_of}, apply funext, intros, simp, split,
+    { intros h, rw set'.union, }
+    rw set.union,
+    rw exists.intro,  
+    rw index, rw function.comp, unfold has_sub.sub,
+    repeat {rw set.union_def}, 
+    repeat {unfold has_sub.sub}, repeat{rw set.mem_def},
     rw createAnnotation, rw createAnnotation', simp, 
-    repeat {rw image}, repeat {rw set.union_def}, simp, unfold has_sdiff.sdiff, 
-    rw set.diff, simp, funext, simp,
+    repeat {rw image},  dsimp, unfold has_sdiff.sdiff, 
+    rw set.diff, simp, funext, simp, rw and_or_distrib_right,
     repeat {rw image}, repeat {rw set.union_def}, simp, 
     repeat {rw set.union_def}, dsimp, 
     repeat {rw set.mem_def}, 
@@ -133,13 +137,11 @@ universe u
 variables {α β γ : Type}
 
 open set
-open variability
-open variability.has_index
 
 lemma index_union : ∀ {α : Type _} (s₁ s₂ : set' α) (pc : PC),
 (index (s₁ ∪ s₂) pc) = (index s₁ pc) ∪ (index s₂ pc) :=
 begin
-    intros, unfold has_union.union, unfold variability.union, unfold set.union, 
+    intros, unfold has_union.union, unfold liftedSet.union, unfold set.union, 
     unfold has_mem.mem, unfold set.mem, 
     rw index, rw index, rw index,
     rw function.comp, rw function.comp, rw function.comp, simp,  
@@ -149,7 +151,7 @@ end
 
 theorem GSN_IA'_correct : 
     ∀ (S S' : Sys') (A  : GSN') (R  : TraceRel') (D : Delta') (pc : PC),
-    (GSN_IA' S S' A R D) | pc = GSN_IA  (S | pc) (S' | pc) (A | pc) (R | pc) (D | pc) 
+    (GSN_IA' S S' A R D) | pc = GSN_IA  (S | pc) (S' | pc) (A | pc) (R | pc) (indexDelta D pc) 
     :=
 begin
     intros, rw GSN_IA', rw GSN_IA, simp, 
