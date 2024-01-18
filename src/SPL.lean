@@ -1,133 +1,149 @@
 -- SPL.lean
 -- Software Product Line variability
---import data.fintype
-import data.finset
-
+import Mathlib.Data.Fintype.Powerset
+import Mathlib.Data.Finset.Powerset
 namespace SPL
 
--- Features and Configurations
-section 
-parameters (Feature : Type) [fintype Feature] [decidable_eq Feature]
+opaque FEAT_COUNT: ℕ
+def Feature : Type := Fin FEAT_COUNT
+instance Feature_finite : Fintype Feature := Fin.fintype FEAT_COUNT
+instance Feature_decidableEq : DecidableEq Feature := instDecidableEqFin FEAT_COUNT
 
+-- a configuration is a set of features
 @[reducible]
-def Config : Type := finset Feature   
-
-end -- Features and Configurations section
-
+def Config : Type := Finset Feature
+instance Config.Fintype : Fintype Config := Finset.fintype
+instance Config.Membership : Membership Feature Config := Finset.instMembershipFinset
 -- Presence Conditions (PCs)
-section 
-parameters (Feature : Type) [fintype Feature] [decidable_eq Feature]
 
 inductive PC : Type
-| All  : PC 
+| All  : PC
 | None : PC
-| Atom : Feature → PC 
+| Atom : Feature → PC
 | Not  : PC → PC
 | And  : PC → PC → PC
 | Or   : PC → PC → PC
 
-end
+--
+-- set membership is decidable only on finite sets of types with
+-- decidable equality, so we need ConfigSpace to be a Finset
+-- instead of a Set
+--
+@[reducible]
+def ConfigSpace: Type := Finset Config
 
-section
-parameters {Feature : Type} [fintype Feature] [decidable_eq Feature]
+instance ConfigSpace.Fintype : Fintype ConfigSpace := Finset.fintype
 
 @[reducible]
-def ConfigSpace : Type := finset (Config Feature)
+def allConfigs : ConfigSpace := Finset.univ
 
-@[reducible]
-def allConfigs : ConfigSpace := finset.univ
+def semantics : PC → ConfigSpace
+| PC.All         => allConfigs
+| PC.None        => ∅
+| PC.Atom f      => Set.toFinset {c: Config | f ∈ c}
+| PC.Not pc      => Set.toFinset (semantics pc)ᶜ
+| PC.And pc₁ pc₂ => (semantics pc₁) ∩ (semantics pc₂)
+| PC.Or  pc₁ pc₂ => (semantics pc₁) ∪ (semantics pc₂)
 
-open PC list
-
-def semantics : PC Feature → ConfigSpace
-| (All)         := allConfigs
-| (None)        := ∅
-| (Atom f)      := allConfigs.filter (λ p, f ∈ p)
-| (Not pc)      := allConfigs.filter (λ p, p ∈ (semantics pc))
-| (And pc₁ pc₂) := (semantics pc₁) ∩ (semantics pc₂)
-| (Or  pc₁ pc₂) := (semantics pc₁) ∪ (semantics pc₂)
-
-end -- section PCs
-
-notation `⟦` p `⟧` := (semantics p)
+notation "⦃" p "⦄" => semantics p
 
 -- Var and Lifted
-section
-parameters {Feature : Type} [fintype Feature] [decidable_eq Feature]   
+--section
+--parameters {Feature : Type} [fintype Feature] [decidable_eq Feature]
 
-structure Var (α : Type) := (v : α) (pc : PC Feature)
+structure Var (α : Type) := (v : α) (pc : PC)
 
-open list 
+open List
 
-def disjointPCs {α : Type} (s : list (Var α)) : Prop := 
-    ∀ (c : Config Feature) (x₁ x₂ : Var α), 
-        x₁ ∈ s → x₂ ∈ s → 
-        c ∈ ⟦x₁.pc⟧ → c ∈ ⟦x₂.pc⟧ → x₁ = x₂
+def disjointPCs {α : Type} (s : List (Var α)) : Prop :=
+    ∀ (c : Config) (x₁ x₂ : Var α),
+        x₁ ∈ s → x₂ ∈ s →
+        c ∈ ⦃x₁.pc⦄ → c ∈ ⦃x₂.pc⦄ → x₁ = x₂
 
-def completePCs {α : Type} (s : list (Var α)) : Prop :=
-    ∀ (c : Config Feature), ∃ (v : (Var α)), v ∈ s ∧ c ∈ ⟦v.pc⟧
+def completePCs {α : Type} (s : List (Var α)) : Prop :=
+    ∀ (c : Config), ∃ (v : (Var α)), v ∈ s ∧ c ∈ ⦃v.pc⦄
 
 structure Lifted (α : Type) :=
-    (s    : list (Var α))
-    (disj : disjointPCs s) 
+    (s    : List (Var α))
+    (disj : disjointPCs s)
     (comp : completePCs s)
 
-end -- section Var and Lifted
+postfix:50 "↑" => Lifted
 
-postfix `↑`:(max+1) := Lifted
-
--- list_find -- helper for index
-section 
-
-open classical
-
-lemma list_find {α : Type} (q : α → Prop) [decidable_pred q] : 
-    ∀ (l : list α), (∃ y, y ∈ l ∧ q y) → (list.find q l).is_some := 
-begin
-    intros l h₁, 
-    induction l,
+-- List_find -- helper for index
+lemma List_find {α : Type} (q : α → Bool): -- [DecidablePred q] :
+    ∀ (l : List α), (∃ y, y ∈ l ∧ q y) → (List.find? q l).isSome :=
+by
+    intros l h₁
+    induction l with
     -- base case
-    apply exists.elim h₁, intros a h₂, apply and.elim h₂, intros h₃ h₄, simp, 
-    apply list.not_mem_nil a h₃,
+    | nil =>
+        apply Exists.elim h₁
+        intros a h₂
+        apply And.left at h₂
+        let _ := Iff.mp (List.mem_nil_iff a) h₂
+        contradiction
     -- induction
-    unfold list.find, cases decidable.em (q l_hd) with hpos hneg,
-    { rw if_pos hpos, simp },
-    { rw if_neg hneg, apply exists.elim h₁, intros a h₂, apply l_ih, apply exists.intro a,
-      simp at h₂, rw and.comm at h₂, rw and_or_distrib_left at h₂, apply or.elim h₂, 
-      {intro h₃, apply and.elim h₃, intros h₄ h₅, rw← h₅ at hneg, contradiction},
-      {intro h₃, rw and.comm, exact h₃}
-    } 
-end
+    | cons x xs ih =>
+        rw [List.find?]
+        cases Classical.em (q x) with
+        | inl hpos => simp [hpos]
+        | inr hneg =>
+            simp [hneg]
+            apply ih
+            simp at h₁
+            apply Or.elim h₁
+            {
+                intro contra
+                contradiction
+            }
+            {
+                intro h
+                exact h
+            }
 
-end --section list_find
+def index' {α: Type} (v : α↑) (ρ : Config) : Var α :=
+    let pred := λ (u: Var α) ↦ decide (ρ ∈ semantics (u.pc)) = true
+    let r    := List.find? pred v.s
+    if  h : r.isSome
+    then Option.get r h
+    else let vs := (v.comp ρ)
+         let res := (List_find pred v.s vs)
+         False.elim (h res)
+
+
+def index {α: Type} (v : α↑) (ρ : Config) : α :=
+    (index' v ρ).v
+
+instance Lifted.Setoid: Setoid (Lifted α) := {
+    r := λ v₁ v₂: Lifted α ↦
+}
+
 
 -- indexing
-section 
-variables {Feature: Type} [fintype Feature] [decidable_eq Feature] {α : Type}
+def index'' (v : Lifted α) (ρ : Config) : Option (Var α) :=
+    List.find? (λ (u: Var α) ↦ ρ ∈ ⦃u.pc⦄) v.s
 
-def index'' (v : Lifted α) (ρ : Config Feature) : option (Var α) :=
-    list.find (λ (u: @Var Feature _inst_1 _inst_2 α), ρ ∈ ⟦u.pc⟧) v.s
-
-def configRel (v : Lifted α) (c₁ c₂ : Config Feature) : Prop :=
+def configRel (v : Lifted α) (c₁ c₂ : Config) : Prop :=
     index'' v c₁ = index'' v c₂
 
-lemma configRelReflexive (v : α↑) : ∀ (ρ : Config Feature), configRel v ρ ρ :=
+lemma configRelReflexive (v : α↑) : ∀ (ρ : Config), configRel v ρ ρ :=
 begin intros ρ, unfold configRel end
- 
-lemma configRelSymmetric (v: α↑) : 
+
+lemma configRelSymmetric (v: α↑) :
     ∀ (c₁ c₂ : Config Feature), configRel v c₁ c₂ → configRel v c₂ c₁ :=
 begin
     intros c₁ c₂, unfold configRel, intros h, rw h
 end
 
-lemma configRelTransitive (v: α↑) : 
-    ∀ (c₁ c₂ c₃: Config Feature), 
+lemma configRelTransitive (v: α↑) :
+    ∀ (c₁ c₂ c₃: Config Feature),
         configRel v c₁ c₂ → configRel v c₂ c₃ → configRel v c₁ c₃ :=
 begin
     intros c₁ c₂ c₃, unfold configRel, intros h₁ h₂, rw h₁, rw← h₂
 end
 
-theorem configRel_equiv (α : Type) (v : Lifted α) : @equivalence (Config Feature) (configRel v) := 
+theorem configRel_equiv (α : Type) (v : Lifted α) : @equivalence (Config Feature) (configRel v) :=
 mk_equivalence (configRel v) (configRelReflexive v) (configRelSymmetric v) (configRelTransitive v)
 
 instance lifted_setoid (α : Type) (v : α↑): setoid (Config Feature) :=
@@ -135,38 +151,24 @@ setoid.mk (configRel v) (configRel_equiv α v)
 
 #print lifted_setoid
 
-def index' --[t : fintype Feature] [d : decidable_eq Feature] 
-    (v : Lifted α) (ρ : Config Feature) : Var α :=
-    let pred := λ (u: @Var Feature _inst_1 _inst_2 α), ρ ∈ semantics (u.pc),
-        r    := list.find pred v.s in 
-    if  h : r.is_some 
-    then option.get h
-    else false.elim 
-        begin 
-            apply h, apply (list_find pred v.s (v.comp ρ))
-        end
-
-def index (v : Lifted α) (ρ : Config Feature) : α :=
-    (index' v ρ).v
-
-lemma index_unique (v : Lifted α) (x : Var α) (ρ : Config Feature)  
+lemma index_unique (v : Lifted α) (x : Var α) (ρ : Config Feature)
     : x ∈ v.s → ρ ∈ semantics (x.pc) → (index'' v ρ) = some x :=
 begin
-    intros h1 h2, 
-    unfold index'',   
+    intros h1 h2,
+    unfold index'',
     --generalize_hyp h3 : (hd :: tl) = xs,
     induction h3 : v.s generalizing x,
     -- base case
-    rw h3 at h1, simp at h1, contradiction, 
+    rw h3 at h1, simp at h1, contradiction,
     -- induction
-    unfold list.find, split_ifs, 
+    unfold List.find, split_ifs,
     apply v.disj, rw h3, simp,
     exact h1,
-    exact h, 
-    exact h2, 
-    apply ih, 
+    exact h,
+    exact h2,
+    apply ih,
 
-    --simp, split_ifs, 
+    --simp, split_ifs,
     {rw option.get_of_mem, simp, }
 end
 
