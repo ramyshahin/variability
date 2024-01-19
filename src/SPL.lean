@@ -115,63 +115,27 @@ def index' {α: Type} (v : α↑) (ρ : Config) : Var α :=
 def index {α: Type} (v : α↑) (ρ : Config) : α :=
     (index' v ρ).v
 
-instance Lifted.Setoid: Setoid (Lifted α) := {
-    r := λ v₁ v₂: Lifted α ↦
+-- this holds even if we have duplicate atoms within a lifted value
+-- for example: [(7,pc₁), (5,pc₂), (7,pc₃)]. Here configurations
+-- included within pc₁ and pc₃ are considered equivalent.
+instance Config.Setoid {α: Type} (v: α↑): Setoid Config := {
+    r := λ c₁ c₂: Config ↦ index v c₁ = index v c₂
+    iseqv := {
+    refl  :=
+      by
+        intro x
+        rfl
+    symm  :=
+      by
+        intro x y h
+        rw [h]
+    trans :=
+      by
+        intros x y z h₀ h₁
+        rw[h₀,←h₁]
+  }
 }
 
-
--- indexing
-def index'' (v : Lifted α) (ρ : Config) : Option (Var α) :=
-    List.find? (λ (u: Var α) ↦ ρ ∈ ⦃u.pc⦄) v.s
-
-def configRel (v : Lifted α) (c₁ c₂ : Config) : Prop :=
-    index'' v c₁ = index'' v c₂
-
-lemma configRelReflexive (v : α↑) : ∀ (ρ : Config), configRel v ρ ρ :=
-begin intros ρ, unfold configRel end
-
-lemma configRelSymmetric (v: α↑) :
-    ∀ (c₁ c₂ : Config Feature), configRel v c₁ c₂ → configRel v c₂ c₁ :=
-begin
-    intros c₁ c₂, unfold configRel, intros h, rw h
-end
-
-lemma configRelTransitive (v: α↑) :
-    ∀ (c₁ c₂ c₃: Config Feature),
-        configRel v c₁ c₂ → configRel v c₂ c₃ → configRel v c₁ c₃ :=
-begin
-    intros c₁ c₂ c₃, unfold configRel, intros h₁ h₂, rw h₁, rw← h₂
-end
-
-theorem configRel_equiv (α : Type) (v : Lifted α) : @equivalence (Config Feature) (configRel v) :=
-mk_equivalence (configRel v) (configRelReflexive v) (configRelSymmetric v) (configRelTransitive v)
-
-instance lifted_setoid (α : Type) (v : α↑): setoid (Config Feature) :=
-setoid.mk (configRel v) (configRel_equiv α v)
-
-#print lifted_setoid
-
-lemma index_unique (v : Lifted α) (x : Var α) (ρ : Config Feature)
-    : x ∈ v.s → ρ ∈ semantics (x.pc) → (index'' v ρ) = some x :=
-begin
-    intros h1 h2,
-    unfold index'',
-    --generalize_hyp h3 : (hd :: tl) = xs,
-    induction h3 : v.s generalizing x,
-    -- base case
-    rw h3 at h1, simp at h1, contradiction,
-    -- induction
-    unfold List.find, split_ifs,
-    apply v.disj, rw h3, simp,
-    exact h1,
-    exact h,
-    exact h2,
-    apply ih,
-
-    --simp, split_ifs,
-    {rw option.get_of_mem, simp, }
-end
-
-end -- indexing section
+def ConfigPartition {α:Type} (v:α↑) : Type := Quotient (Config.Setoid v)
 
 end SPL
