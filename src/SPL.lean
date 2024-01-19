@@ -69,9 +69,9 @@ structure Lifted (α : Type) :=
     (comp : completePCs s)
 
 postfix:50 "↑" => Lifted
-
+#print Decidable.predToBool
 -- List_find -- helper for index
-lemma List_find {α : Type} (q : α → Bool): -- [DecidablePred q] :
+lemma List_find {α : Type} (q : α → Prop) [DecidablePred q] :
     ∀ (l : List α), (∃ y, y ∈ l ∧ q y) → (List.find? q l).isSome :=
 by
     intros l h₁
@@ -103,7 +103,7 @@ by
             }
 
 def index' {α: Type} (v : α↑) (ρ : Config) : Var α :=
-    let pred := λ (u: Var α) ↦ decide (ρ ∈ semantics (u.pc)) = true
+    let pred := λ (u: Var α) ↦ ρ ∈ semantics (u.pc)
     let r    := List.find? pred v.s
     if  h : r.isSome
     then Option.get r h
