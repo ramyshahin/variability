@@ -6,6 +6,7 @@ package «variability» where
 
 lean_lib «Variability» where
   -- add library configuration options here
+  roots := #[`Var]
 
 @[default_target]
 lean_exe «variability» where
