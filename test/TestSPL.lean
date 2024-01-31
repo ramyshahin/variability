@@ -4,12 +4,35 @@ open SPL
 
 namespace Test0
 
-inductive Features
+inductive Feats
 | FA
 | FB
 | FC
+deriving DecidableEq, Repr--, FeatureSet
 
---def s := SPL Features _ _
+open Feats
+def lFeats : List Feats := [FA, FB, FC]
 
---def pc0 := PC.Atom Features.FA
+instance Feats_Finite: Fintype Feats := Fintype.ofList lFeats
+  (by
+    intro x
+    apply @Feats.casesOn (λ x ↦ x ∈ lFeats)
+    repeat simp [lFeats]
+  )
+
+instance featSet: FeatureSet Feats where
+  fin_Features := inferInstance
+  decEq_Features :=inferInstance
+
+def s : SPL Feats := SPL.mk
+
+open Feats
+
+def pc0 := PC.Atom FA
+def pc1 := FB
+def pc2 := pc0 &&& pc1
+def pc3:@PC Feats := FB ||| FC
+def pc4 := ~~~pc0
+
+
 end Test0
