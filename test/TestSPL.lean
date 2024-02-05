@@ -31,8 +31,11 @@ open Feats
 def pc0 := PC.Atom FA
 def pc1 := FB
 def pc2 := pc0 &&& pc1
-def pc3:@PC Feats := FB ||| FC
+def pc3:PC Feats := FB ||| FC
 def pc4 := ~~~pc0
 
+def cp := split pc0
+-- lifted values
+def l0 := Lifted.mk cp (7 ::ᵥ 9 ::ᵥ Vector.nil)
 
 end Test0
