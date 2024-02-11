@@ -8,11 +8,12 @@ inductive Feats
 | FA
 | FB
 | FC
-deriving DecidableEq, Repr--, FeatureSet
+deriving Repr
 
 open Feats
 def lFeats : List Feats := [FA, FB, FC]
 
+/-
 instance Feats_Finite: Fintype Feats := Fintype.ofList lFeats
   (by
     intro x
@@ -20,9 +21,11 @@ instance Feats_Finite: Fintype Feats := Fintype.ofList lFeats
     repeat simp [lFeats]
   )
 
+
 instance featSet: FeatureSet Feats where
   fin_Features := inferInstance
   decEq_Features :=inferInstance
+-/
 
 def s : SPL Feats := SPL.mk
 
@@ -34,8 +37,8 @@ def pc2 := pc0 &&& pc1
 def pc3:PC Feats := FB ||| FC
 def pc4 := ~~~pc0
 
-def cp := split pc0
+def cp := singletonCP.split pc0
 -- lifted values
-def l0 := Lifted.mk cp (7 ::ᵥ 9 ::ᵥ Vector.nil)
+def l0 := Lifted.mk cp (λ p ↦  8)
 
 end Test0

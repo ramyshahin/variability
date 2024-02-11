@@ -10,7 +10,7 @@ class FeatureSet (α: Type) where
     fin_Features: Fintype α
     decEq_Features: DecidableEq α
 
-structure SPL (α: Type) [FeatureSet α] where
+structure SPL (α: Type) /-[FeatureSet α]-/ where
 
 section
 
@@ -21,14 +21,14 @@ variable (s: SPL F)
 
 -- a configuration is a set of features
 @[reducible]
-def Config: Type :=
-    Finset F
+def Config: Type := Set F
+    --Finset F
 
 instance Config.Fintype : Fintype (@Config F) :=
     inferInstance
 
-instance Config.DecidableEq: DecidableEq (@Config F) :=
-    Finset.decidableEq
+--instance Config.DecidableEq: DecidableEq (@Config F) :=
+--    Finset.decidableEq
 
 inductive PC (α:Type): Type
 | All  : PC α
@@ -51,30 +51,30 @@ instance {F: Type} : Complement (@PC F) := Complement.mk PC.Not
 -- instead of a Set
 --
 @[reducible]
-def ConfigSpace :=
-    Finset (@Config F)
+def ConfigSpace := Set (@Config F)
+    --Finset (@Config F)
 
-instance ConfigSpace.Fintype: Fintype (@ConfigSpace F) :=
-    Finset.fintype
+--instance ConfigSpace.Fintype: Fintype (@ConfigSpace F) :=
+--    Finset.fintype
 
 instance ConfigSpace.Membership: Membership (@Config F) (@ConfigSpace F) :=
     inferInstance
 
 @[reducible]
-def allConfigs: @ConfigSpace F := Finset.univ
+def allConfigs: @ConfigSpace F := Set.univ --Finset.univ
 
 end
 
 section
 
-variable {F: Type} [FeatureSet F]
-variable {s: SPL F}
-variable (α: Type)
+--variable {F: Type} [FeatureSet F]
+--variable {s: SPL F}
+--variable (α: Type)
 
-def semantics {F: Type} [FeatureSet F]: @PC F → @ConfigSpace F
+def semantics {F: Type} /-[FeatureSet F]-/: @PC F → @ConfigSpace F
 | PC.All         => allConfigs
 | PC.None        => ∅
-| PC.Atom f      => Finset.filter (λc: Config ↦ f ∈ c) allConfigs
+| PC.Atom f      => {ρ:@Config F | f ∈ ρ} --Finset.filter (λc: Config ↦ f ∈ c) allConfigs
 | PC.Not pc      => (semantics pc)ᶜ
 | PC.And pc₁ pc₂ => (semantics pc₁) ∩ (semantics pc₂)
 | PC.Or  pc₁ pc₂ => (semantics pc₁) ∪ (semantics pc₂)
@@ -85,100 +85,266 @@ structure Var (α: Type) {F: Type} [fs: FeatureSet F] :=
     v   : α
     pc  : @PC F
 
-def disjointPCs {F: Type} [FeatureSet F] (pcs : List (PC F)) : Prop :=
-    ∀ (c : @Config F) (pc₁ pc₂ : PC F),
-        pc₁ ∈ pcs → pc₂ ∈ pcs →
+def disjointPCs {F: Type} /-[FeatureSet F]-/ (pcs: Set (PC F)) : Prop :=
+--| nil : disjointPCs [] --F fs []
+--| singleton x: disjointPCs [x]
+--| cons x xs : (xs.all (λx' ↦ ⦃x⦄ ∩ ⦃x'⦄ == ∅)) → disjointPCs xs → disjointPCs (x :: xs)
+    ∀ (c : @Config F) (pc₁ pc₂ : pcs),
         c ∈ ⦃pc₁⦄ → c ∈ ⦃pc₂⦄ → pc₁ = pc₂
 
-def completePCs {F: Type} [FeatureSet F] (pcs : List (PC F)) : Prop :=
-    ∀ (c : @Config F), ∃ (pc : PC F), pc ∈ pcs ∧ c ∈ ⦃pc⦄
+def completePCs {F: Type} /-[FeatureSet F]-/ (pcs : Set (PC F)) : Prop :=
+    ∀ (c : @Config F), ∃ (pc : pcs), c ∈ ⦃pc⦄
 
-structure ConfigPartition {n: ℕ} [fs: FeatureSet F] :=
-    pcs: Vector (PC F) n
-    disjoint: disjointPCs (Vector.toList pcs)
-    complete: completePCs (Vector.toList pcs)
-
-def index {n: ℕ} [fs: FeatureSet F] (p : @ConfigPartition F n fs) (ρ : @Config F) : {x:ℕ // x < n} :=
+structure ConfigPartition {F: Type} := --[fs: FeatureSet F] :=
+    pcs: Set (PC F)
+    disjoint: disjointPCs pcs
+    complete: completePCs pcs
+/-
+def index {n: ℕ} [fs: FeatureSet F] (p : @ConfigPartition F n fs) (ρ : @Config F) : PC F :=
     let i := List.findIdx (λ (x: PC F) ↦ ρ ∈ semantics x) p.pcs.toList
-    let p: i < n :=
+    let pr: i < n :=
     by
         rw[←(Vector.length_val p.pcs)]
         apply List.findIdx_lt_length_of_exists
         simp
         apply p.complete
-    ⟨i, p⟩
-
+    p.pcs.get ⟨i, pr⟩
+-/
 -- this holds even if we have duplicate atoms within a lifted value
 -- for example: [(7,pc₁), (5,pc₂), (7,pc₃)]. Here configurations
 -- included within pc₁ and pc₃ are considered equivalent.
-instance Config.Setoid {n:ℕ} [fs: FeatureSet F] (p: @ConfigPartition F n fs): Setoid (@Config F) := {
-    r := λ c₁ c₂: @Config F ↦ index p c₁ = index p c₂
+instance Config.Setoid {F: Type}/-[fs: FeatureSet F]-/ (p: @ConfigPartition F): Setoid (@Config F) := {
+    r := λ (ρ₁ ρ₂: @Config F) ↦ ∃!pc: p.pcs, ρ₁ ∈ ⦃pc⦄ ∧ ρ₂ ∈ ⦃pc⦄
     iseqv := {
-    refl  :=
-      by
-        intro x
-        rfl
-    symm  :=
-      by
-        intro x y h
-        rw [h]
-    trans :=
-      by
-        intros x y z h₀ h₁
-        rw[h₀,←h₁]
+        refl  := by
+            intros x
+            apply Exists.elim (p.complete x)
+            intros a h
+            apply Exists.intro a
+            simp
+            apply And.intro
+                ( h )
+                ( by
+                    intros pc h₁ h₂
+                    apply (p.disjoint x { val := pc, property := h₁ } a)
+                    simp
+                    exact h₂
+                    exact h )
+        symm  := by
+            intro x y h
+            apply Exists.elim h
+            intros a h₁
+            simp at h₁
+            apply Exists.intro a
+            simp
+            apply And.intro
+                ( by simp [h₁.left] )
+                ( by
+                    intros a' h₂ h₃ h₄
+                    apply h₁.right
+                    exact h₄
+                    exact h₃
+                )
+        trans := by
+            intros x y z h₀ h₁
+            apply Exists.elim h₀
+            intros a h₂
+            simp at h₂
+            apply Exists.intro a
+            simp
+            apply Exists.elim h₁
+            intros b h₃
+            simp at h₃
+            have h₄: a = b := p.disjoint y a b h₂.left.right h₃.left.left
+            rw [←h₄] at h₃
+            apply And.intro
+                (And.intro h₂.left.left h₃.left.right)
+                ( by
+                    intros d e h₅ _
+                    have h₇ := p.disjoint x a ⟨d, e⟩ h₂.left.left h₅
+                    rw[h₇]
+                )
   }
 }
 
-def ConfigQuotient {α:Type} [fs: FeatureSet F] (p: @ConfigPartition F n fs) : Type := Quotient (Config.Setoid p)
+def ConfigQuotient /-[fs: FeatureSet F]-/ (p: @ConfigPartition F) : Type := Quotient (Config.Setoid p)
 
-def split (pc: PC F) [fs: FeatureSet F] : @ConfigPartition F 2 fs :=
+def singletonCP {F: Type} :=
+    @ConfigPartition.mk F
+        {PC.All} --::ᵥ Vector.nil)
+        (by simp[disjointPCs])
+        (by simp[completePCs, semantics])
+
+def Set.split (α: Type) (s: Set α) (f: α → (α × α)) : Set α :=
+Set.image (Prod.fst ∘ f) s ∪ Set.image (Prod.snd ∘ f) s
+
+--| 0, .nil, _ => .nil
+--| Nat.succ k, v, f => let p:= f v.head; p.fst ::ᵥ p.snd ::ᵥ (split k v.tail f)
+lemma splitDisjoint {F: Type} {p: ConfigPartition} (pc: PC F): disjointPCs (Set.split (PC F) p.pcs (λ p ↦ (pc &&& p, ~~~pc &&& p))) :=
+by
+    simp[disjointPCs, Set.split]
+    intros c a h₀ b h₁ h₂ h₃
+    apply Or.elim h₀
+    {
+        intros h₄
+        apply Exists.elim h₄
+        intros x h₅
+        simp [←h₅.right, semantics] at h₂
+        apply Or.elim h₁
+        {
+            intros h₆
+            apply Exists.elim h₆
+            intros y h₇
+            simp[←h₇.right, semantics] at h₃
+            have h₈ := p.disjoint c ⟨x, h₅.left⟩ ⟨y, h₇.left⟩ h₂.right h₃.right
+            simp at h₈
+            simp[←h₅.right, ←h₇.right, h₈]
+        }
+        {
+            intros h₆
+            apply Exists.elim h₆
+            intros y h₇
+            simp[←h₇.right, semantics] at h₃
+            apply Not.elim h₃.left h₂.left
+        }
+    }
+    {
+        intros h₄
+        apply Exists.elim h₄
+        intros x h₅
+        simp [←h₅.right, semantics] at h₂
+        apply Or.elim h₁
+        {
+            intros h₆
+            apply Exists.elim h₆
+            intros y h₇
+            simp[←h₇.right, semantics] at h₃
+            apply Not.elim h₂.left h₃.left
+        }
+        {
+            intros h₆
+            apply Exists.elim h₆
+            intros y h₇
+            simp[←h₇.right, semantics] at h₃
+            have h₈ := p.disjoint c ⟨x, h₅.left⟩ ⟨y, h₇.left⟩ h₂.right h₃.right
+            simp at h₈
+            simp[←h₅.right, ←h₇.right, h₈]
+        }
+    }
+
+lemma splitComplete {F: Type} {p: ConfigPartition} (splitter: PC F): completePCs (Set.split (PC F) p.pcs (λ p ↦ (splitter &&& p, ~~~splitter &&& p))) :=
+by
+    simp[Set.split, completePCs]
+    intros c --a h₀ b h₁ h₂ h₃
+    apply Exists.elim (p.complete c)
+    intros x h₀
+    apply Or.elim (Classical.em (c ∈ ⦃splitter &&& x.val⦄))
+    (
+        intros h₁
+        --simp[semantics] at h₁
+        apply Exists.intro (splitter &&& x)
+        --simp[semantics]
+        apply And.intro
+        (
+            apply Or.intro_left
+            apply Exists.intro ↑x
+            simp
+            exact h₁
+        )
+    )
+    (
+        intro h₁
+        simp[semantics] at h₁
+        apply Exists.intro (~~~splitter &&& x)
+        simp[semantics]
+        apply And.intro
+        (
+            apply Or.intro_right
+            apply Exists.intro ↑x
+            apply And.intro
+            (
+                simp
+                simp
+                apply And.intro
+                (
+                    apply Classical.byContradiction
+                    intros h₂
+                    simp at h₂
+                    apply h₁ h₂
+                    exact h₀
+                    exact h₀
+                )
+            )
+        )
+    )
+
+
+    /-
+    {
+        intros h₄
+        apply Exists.elim h₄
+        intros x h₅
+        simp [←h₅.right, semantics] at h₂
+        apply Or.elim h₁
+        {
+            intros h₆
+            apply Exists.elim h₆
+            intros y h₇
+            simp[←h₇.right, semantics] at h₃
+            have h₈ := p.disjoint c ⟨x, h₅.left⟩ ⟨y, h₇.left⟩ h₂.right h₃.right
+            simp at h₈
+            simp[←h₅.right, ←h₇.right, h₈]
+        }
+        {
+            intros h₆
+            apply Exists.elim h₆
+            intros y h₇
+            simp[←h₇.right, semantics] at h₃
+            apply Not.elim h₃.left h₂.left
+        }
+    }
+    {
+        intros h₄
+        apply Exists.elim h₄
+        intros x h₅
+        simp [←h₅.right, semantics] at h₂
+        apply Or.elim h₁
+        {
+            intros h₆
+            apply Exists.elim h₆
+            intros y h₇
+            simp[←h₇.right, semantics] at h₃
+            apply Not.elim h₂.left h₃.left
+        }
+        {
+            intros h₆
+            apply Exists.elim h₆
+            intros y h₇
+            simp[←h₇.right, semantics] at h₃
+            have h₈ := p.disjoint c ⟨x, h₅.left⟩ ⟨y, h₇.left⟩ h₂.right h₃.right
+            simp at h₈
+            simp[←h₅.right, ←h₇.right, h₈]
+        }
+    }-/
+--lemma splitSound /-[FeatureSet F]-/ (pc₁ pc₂: PC F): ⦃pc₁⦄ = ⦃pc₁ &&& pc₂⦄ ∪ ⦃pc₁ &&& ~~~pc₂⦄ :=
+--by
+--    simp [semantics]
+    --rw[←Finset.coe_inj]
+    --simp[←Set.inter_union_distrib_left]
+
+def ConfigPartition.split {F: Type} /-[fs: FeatureSet F]-/ {p: @ConfigPartition F} (pc: PC F) : @ConfigPartition F :=
     ConfigPartition.mk
-         (pc ::ᵥ ~~~pc ::ᵥ Vector.nil)
-         (by
-            simp[disjointPCs]
-            intros c pc₁ pc₂ h₁ h₂ h₃ h₄
-            apply Or.elim h₁
-            (
-                intros h₅
-                apply Or.elim h₂
-                (
-                    intros h₆
-                    simp[h₅, h₆]
-                )
-                intros h₆
-                rw[h₆] at h₄
-                rw[h₅] at h₃
-                simp[Complement.complement, semantics] at h₄
-                contradiction
-            )
-            (
-                intros h₅
-                apply Or.elim h₂
-                (
-                    intros h₆
-                    rw[h₆] at h₄
-                    rw[h₅] at h₃
-                    simp[Complement.complement, semantics] at h₃
-                    contradiction
-                )
-                (
-                    intros h₆
-                    rw[h₅,h₆]
-                )
-            )
-         )
-         (by
-            simp[completePCs, Complement.complement, semantics]
-            intros c
-            apply Classical.em (c ∈ ⦃pc⦄)
-         )
+         (Set.split (PC F) p.pcs (λp ↦ ⟨pc &&& p, ~~~pc &&& p⟩))
+         (splitDisjoint pc)
+         (splitComplete pc)
 
-structure Lifted (α : Type) {n: ℕ} {F: Type} [fs: FeatureSet F] :=
-    configs: @ConfigPartition F n fs
-    vals   : Vector α n
+structure Lifted (α : Type) {F: Type} :=
+    configs: @ConfigPartition F
+    vals   : ConfigQuotient configs → α
 
 postfix:50 "↑" => Lifted
 
+--def index (l:α↑) (ρ:Config) := Quot.lift l.vals
 end -- section
 
 end SPL
