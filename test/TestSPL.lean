@@ -38,15 +38,18 @@ def pc4 := ~~~pc0
 #eval pc0 = pc2
 
 def cp := singletonCP.split pc0
-#print cp.pcs
+#eval pc2
 
 -- lifted values
-def l0 := Variational.mk cp (λ p ↦  8)
+def l0 := Variational.mk cp (λ _ ↦  8)
 
-def ρ₀ : Set Feats := {FA}
+def ρ₀ : @Config Feats := {Feats.FA}
+def ρ₁ : @Config Feats := {Feats.FA, Feats.FB}
 
-def x := index l0 {FA}
-def y := index l0 {FA, FC}
+def x := cp⟦ρ₀⟧
+def y := cp⟦ρ₁⟧
+
+#print Quotient.eq
 
 #eval x = y
 end Test0

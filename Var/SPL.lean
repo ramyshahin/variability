@@ -182,8 +182,10 @@ instance Config.Setoid {F: Type}/-[fs: FeatureSet F]-/ (p: @ConfigPartition F): 
 
 def ConfigQuotient /-[fs: FeatureSet F]-/ (p: @ConfigPartition F) : Type := Quotient (Config.Setoid p)
 
-def ConfigQuotient.mk {F: Type} {p: @ConfigPartition F} (ρ: @Config F) : ConfigQuotient p :=
+def ConfigQuotient.mk {F: Type} (p: @ConfigPartition F) (ρ: @Config F) : ConfigQuotient p :=
     @Quotient.mk' _ (Config.Setoid p) ρ
+
+notation p "⟦ " c "⟧ " => ConfigQuotient.mk p c
 
 def singletonCP {F: Type} :=
     @ConfigPartition.mk F
