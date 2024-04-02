@@ -12,18 +12,15 @@ namespace liftedSet
 
 --universes u v
 
+opaque F: Type
 opaque α: Type
 opaque β: Type
-opaque γ : Type
+opaque γ: Type
 
-structure Var (α : Type) :=
-    (v : α) (pc : PC)
+--structure Var (α : Type) :=
+--    (v : α) (pc : PC)
 
-def set' (α : Type) /-[fintype α] [decidable_eq α]-/: Type := α → SPL.PC
-
-@[class]
-structure has_index (α : Type) {β : Type} :=
-(index_ : α → PC → β )
+abbrev vset (F: Type) (α : Type) := Set (α × @SPL.Config F) -- → Prop
 
 --def to_finset {α: Type} [f: fintype α] (s: set α): finset α :=
 --set.finite.to_finset --to_finset
@@ -43,13 +40,13 @@ structure has_index (α : Type) {β : Type} :=
     --set.finite.coe_to_finset
 --    (set.finite.of_fintype s).to_finset
 
+@[simp]
+def vset.index {F α : Type} (s: vset F α) (ρ: @SPL.Config F) : Set α :=
+    λ x ↦ s (x, ρ)
+
 --noncomputable
-def index {α:Type} --[f: fintype α] [decidable_eq α]
-    (s : set' α) (pc : SPL.PC) : Set α := --((And pc) ∘ s)
-        λx ↦ if (⦃SPL.PC.And pc (s x)⦄ == ∅)
-             then False
-             else True
-        --@set.to_finset α ((and pc) ∘ s) (fintype.of_finset f) --(@finset.fintype α f)
+instance vset.Variational {F α : Type} : @SPL.Variational F (Set α) (vset F α) :=
+    ⟨ vset.index ⟩
 
 --protected def mem {α:Type} [fintype α] [decidable_eq α]
 --    (x : Var α) (s : set' α) : Prop := x.2 → (s x.1)
@@ -57,31 +54,44 @@ def index {α:Type} --[f: fintype α] [decidable_eq α]
 --instance {α:Type} [fintype α] [decidable_eq α]:
 --    has_mem (Var α) (set' α) := ⟨liftedSet.mem⟩
 
+instance vset.Inhabited {F α: Type}: Inhabited (vset F α) :=
+⟨λ (_, ρ) ↦ ρ = ∅⟩
+
+--instance liftedSet_has_mem {F α:Type} : --[fintype α] [decidable_eq α]:
+--    Membership α (vset F α) := ⟨λx s ↦ ∃ ρ, s (x, ρ) ⟩
+
+instance liftedSet_has_mem2 {F α:Type} : --[fintype α] [decidable_eq α]:
+    Membership (α × (@SPL.Config F)) (vset F α) :=
+    inferInstance
+
+--instance vset.decidableMem {F α: Type} (x: α) (s: vset F α): Decidable (x ∈ s) :=
+--    inferInstance
+
+-- def mem {α:Type} (x:α) (s: vset α) : @SPL.PC F := s x
+
+--protected def subset {F α:Type} --[fintype α] [decidable_eq α]
+--    (s₁ s₂ : vset F α) : Prop := ∀ a, a ∈ s₁ → a ∈ s₂
+
+--instance {F α:Type} :-- [fintype α] [decidable_eq α]:
+--    HasSubset (vset F α) := ⟨ liftedSet.subset ⟩
 --@[simp]
---instance liftedSet_has_mem {α:Type}: --[fintype α] [decidable_eq α]:
---    Membership α (set' α) := ⟨λx s ↦⦃s x⦄ ≠ ∅⟩
+--protected def union (F α:Type) -- [fintype α] [decidable_eq α]
+ --   (s₁ s₂ : vset F α) : vset F α := λ (x, ρ) ↦ s₁ (x, ρ) ∨ s₂ (x, ρ)
 
-def mem {α:Type} (x:α) (s: set' α) : SPL.PC := s x
+--instance vsetUnion (F α:Type):-- [fintype α] [decidable_eq α]:
+--    Union (vset F α) := ⟨liftedSet.union F α⟩
 
-protected def subset {α:Type} --[fintype α] [decidable_eq α]
-    (s₁ s₂ : set' α) : Prop := ∀ a, a ∈ s₁ → a ∈ s₂
+--protected def inter {F α: Type} [Fintype α] [DecidableEq α]
+--    (s₁ s₂ : vset F α) : vset F α := λ (x, ρ) ↦ s₁ (x, ρ) ∧ s₂ (x, ρ)
 
-instance {α:Type}:-- [fintype α] [decidable_eq α]:
-    HasSubset (set' α) := ⟨ liftedSet.subset ⟩
+--instance interSet' {F α: Type} [Fintype α] [DecidableEq α]:
+--    Inter (vset F α) := ⟨liftedSet.inter⟩
 
-protected def union {α:Type}-- [fintype α] [decidable_eq α]
-    (s₁ s₂ : set' α) : set' α := λ x ↦ (s₁ x) ∨ (s₂ x)
+--protected def diff {α:Type} [Fintype α] [DecidableEq α]-- [fintype α] [decidable_eq α]
+--    (s₁ s₂ : vset F α) : vset F α := λ (x, ρ) ↦ s₁ (x, ρ) ∧ ¬ s₂ (x, ρ)
 
-instance unionSet' {α:Type}:-- [fintype α] [decidable_eq α]:
-    Union (set' α) := ⟨liftedSet.union⟩
-
-protected def diff {α:Type}-- [fintype α] [decidable_eq α]
-    (s₁ s₂ : set' α) : set' α := λ x ↦ (s₁ x) ∧ ¬(s₂ x)
-
-instance {α: Type }:-- [fintype α] [decidable_eq α]:
-    SDiff (set' α) := ⟨liftedSet.diff⟩
-
-infix:90 "|" => index
+--instance {α: Type } [Fintype α] [DecidableEq α]:-- [fintype α] [decidable_eq α]:
+--    SDiff (vset F α) := ⟨liftedSet.diff⟩
 
 --def image_ {α:Type} {β:Type} --[fintype α] [decidable_eq α]
 --    (f : α → β) (s : set' α) : set (β × PC) :=
@@ -91,20 +101,22 @@ infix:90 "|" => index
 
 --#print set.image
 --#print finset.subtype.fintype
-instance or_is_commutative: IsCommutative PC Or where
+/-
+instance or_is_commutative: IsCommutative (SPL.PC F) SPL.PC.Or where
   comm := λ _ _ ↦ propext or_comm
 instance or_is_associative: IsAssociative PC Or where
   assoc := λ _ _ _ ↦ propext or_assoc
-
+-/
+/-
 def image {α:Type} [Fintype α] {β:Type} --[Fintype β] --[DecidableEq β]
-(f : α → β) (s : set' α) : set' β :=
+(f : α → β) (s : vset α) : vset β :=
 --Finset.image f s _ _
 λ x ↦ let r := {z // f z = x}
       --let fin : Fintype r := Subtype.fintype (λz ↦ f z = x)
       let es := Fintype.elems
       --let fin : Fintype r := Set.Finite.toFinset_setOf r
       Finset.fold Or True s es --(Set.Finite.ofFinset r))
-
+-/
 /-
 theorem index_image {α: Type} [Fintype α] {β: Type} (f: α→β) (s: set' α) (pc: PC):
     (image f s) | pc = Set.image f (s|pc) :=
@@ -128,30 +140,24 @@ by
         intros h₁ h₂
         let y:α,   }
 -/
-
-lemma index_union {α: Type} (x: α) (pc: PC) (s₁ s₂: set' α):
+/-
+lemma index_union {α: Type} (x: α) (pc: @SPL.PC F) (s₁ s₂: vset α):
     (x ∈ s₁|pc ∨ x ∈ s₂|pc) = (x ∈ (s₁ ∪ s₂)|pc) :=
 by
-    intros
-    repeat rw [index]
+    simp [index]
     repeat rw [Function.comp]
     repeat rw [Set.mem_def]
     simp [unionSet', liftedSet.union, and_or_left]
+-/
 
-lemma index_mem {α: Type} (x:α) (pc: PC) (s: set' α):
-    (x ∈ s|pc) = ((x ∈ s) ∧ pc) :=
+lemma index_mem {F α: Type} (x:α) (ρ: @SPL.Config F) (s: vset F α):
+    (x ∈ ((s|ρ) : Set α)) = ((x, ρ) ∈ s) :=
 by
-    --rw[Set.instMembershipSet, Set.Mem]
-    unfold index
-    unfold Function.comp
-    rw [Membership] --has_mem.mem
-    rw [liftedSet_has_mem] --, Set.Mem]
-    --rw and_comm
-
+    simp [vset.Variational, Set.mem_def]
 
 -- filter
-def filter {α: Type} (p: α → Prop) (s: set' α):
-    set' α := λx, p x ∧ s x
+--def filter {α: Type} (p: α → Prop) [Fintype α] [DecidableEq α] [DecidablePred p] (s: vset F α): vset F α :=
+--    λx ↦ if p x then s x else SPL.PC.None
 
 /-
 theorem filter_correct {α:Type} [fintype α] [decidable_eq α] (p: α → Prop) (s: set' α) (pc: PC) [decidable_pred p]:
@@ -162,17 +168,29 @@ by
 
 -/
 
-variables --[fintype α] [decidable_eq α] [fintype β] [decidable_eq β] [fintype γ] [decidable_eq γ]
-    (f₁  : set  α → set  β) (f₂  : set  β  → set  γ)
-    (f₁' : set' α → set' β) (f₂' : set' β  → set' γ)
+opaque f₁  : Set  α → Set β
+opaque f₂  : Set  β  → Set γ
+opaque f₁' : vset F α → vset F β
+opaque f₂' : vset F β  → vset F γ
 
-theorem fun_comp_correct :
-    (∀ a ρ, (f₁ (a | ρ) = (f₁' a) | ρ)) →
-    (∀ b ρ, (f₂ (b | ρ) = (f₂' b) | ρ)) →
-    (∀ a ρ, (f₂ ∘ f₁) (a | ρ) = ((f₂' ∘ f₁') a) | ρ) :=
+theorem fun_comp_correct:
+    (∀ a (ρ: @SPL.Config F), (f₁ (a | ρ) = (f₁' a) | ρ)) →
+    (∀ b (ρ: @SPL.Config F), (f₂ (b | ρ) = (f₂' b) | ρ)) →
+    (∀ a (ρ: @SPL.Config F), (f₂ ∘ f₁) (a | ρ) = ((f₂' ∘ f₁') a) | ρ) :=
 by
-intros h₁ h₂ a ρ, simp,
-rw h₁, rw← h₂
+    intros h₁ h₂ a ρ
+    simp
+    rw [h₁]
+    rw [←h₂]
 
+lemma index_union {α F: Type} (s₁ s₂ : vset F α) (ρ : @SPL.Config F):
+    ((s₁ | ρ) ∪ (s₂ | ρ)) = (((s₁ ∪ s₂) | ρ): Set α) :=
+by
+    --simp [vsetUnion, vset.index]
+    simp [Set.union_def]
+    simp [index_mem]
+    simp [vset.Variational]
+    unfold vset.index
+    simp [vset.index, Set.union, Set.union_def, Set.mem_def, setOf]
 
- liftedSet
+end liftedSet

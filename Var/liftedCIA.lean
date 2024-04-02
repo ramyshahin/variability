@@ -1,121 +1,135 @@
 -- liftedCIA: Variability-aware Change Impact Assessment
-import .cia
-import .liftedSet
+import Var.cia
+import Var.liftedSet
+import Var.SPL
 
 open CIA
-open liftedSet 
+open liftedSet
+open SPL
 
 namespace liftedCIA
 
-def Annotation' := Var Annotation
-def SysEl' := Var SysEl
-def GSNEl' := Var GSNEl
+opaque F: Type
 
-def Sys' : Type := set' SysEl
-def GSN' : Type := set' GSNEl
+abbrev Annotation' := @Var Annotation F
+abbrev SysEl' := @Var SysEl F
+abbrev GSNEl' := @Var GSNEl F
 
-@[derive has_mem (SysEl × GSNEl)]
-def TraceRel' := set' (SysEl × GSNEl)
+abbrev Sys' : Type := vset F SysEl
+abbrev GSN' : Type := vset F GSNEl
+
+--@[derive has_mem (SysEl × GSNEl)]
+abbrev TraceRel' := vset F (SysEl × GSNEl)
 
 --instance: has_mem (SysEl × GSNEl ) TraceRel' := liftedSet.liftedSet_has_mem
 
-def indexTraceRel (t: TraceRel') (pc : PC) : set (SysEl × GSNEl) := 
-    index t pc
+--def indexTraceRel (t: TraceRel') (pc : @PC F) : Set (SysEl × GSNEl) :=
+--    index t pc
 
-instance TraceRel_has_index : has_index TraceRel' :=
-⟨ indexTraceRel ⟩
+--instance TraceRel_has_index : has_index TraceRel' :=
+--⟨ indexTraceRel ⟩
 
-variable sliceSys   (s : Sys)  (es : set SysEl) : Sys
-variable sliceGSN_V (ac : GSN) (es : set GSNEl) : GSN
-variable sliceGSN_R (ac : GSN) (es : set GSNEl) : GSN
 
-constant sliceSys'   (s : Sys')  (es : set' SysEl) : Sys'
-constant sliceGSN_V' (ac : GSN') (es : set' GSNEl) : GSN'
-constant sliceGSN_R' (ac : GSN') (es : set' GSNEl) : GSN'
+--opaque sliceSys: Sys → Set SysEl → Sys
+--opaque sliceGSN_V: GSN → Set GSNEl → GSN
+--opaque sliceGSN_R: GSN → Set GSNEl → GSN
 
-axiom sliceSys_correct : ∀ (s : Sys')  (es : set' SysEl) (pc : PC),
-index (sliceSys' s es) pc = (sliceSys (index s pc) (index es pc))
+opaque sliceSys': Sys' → (@vset F SysEl) → Sys'
+opaque sliceGSN_V': GSN' → (@vset F GSNEl) → GSN'
+opaque sliceGSN_R': GSN' →  @vset F GSNEl → GSN'
 
-axiom sliceGSNV_correct : ∀ (ac : GSN')  (es : set' GSNEl) (pc : PC),
-index (sliceGSN_V' ac es) pc = sliceGSN_V (index ac pc) (index es pc)
+--variable (sliceSys': Sys' → (@vset F SysEl) → Sys')
+--variable (sliceGSN_V': GSN' → (@vset F GSNEl) → GSN')
+--variable (sliceGSN_R': GSN' →  @vset F GSNEl → GSN')
 
-axiom sliceGSNR_correct : ∀ (ac : GSN')  (es : set' GSNEl) (pc : PC),
-index (sliceGSN_R' ac es) pc = sliceGSN_R (index ac pc) (index es pc)
+--instance : Variational F Sys Sys' :=
+--    vset.Variational
+
+--instance : Variational F GSN GSN' :=
+--    vset.Variational
+
+axiom sliceSys_correct:
+∀ (s : Sys')  (es : @vset F SysEl) (ρ : @Config F),
+    ((sliceSys' s es) | ρ) = (sliceSys (s | ρ) (es | ρ))
+
+axiom sliceGSNV_correct :
+∀ (ac : GSN')  (es : vset F GSNEl) (ρ : @Config F),
+    ((sliceGSN_V' ac es) | ρ) = sliceGSN_V (ac | ρ) (es | ρ)
+
+axiom sliceGSNR_correct :
+∀ (ac : GSN')  (es : vset F GSNEl) (ρ : @Config F),
+    ((sliceGSN_R' ac es) | ρ) = sliceGSN_R (ac | ρ) (es | ρ)
 
 structure Delta' :=
-(add : set' SysEl) (delete : set' SysEl) (modify : set' SysEl)
+(add : vset F SysEl) (delete : vset F SysEl) (modify : vset F SysEl)
 
-def indexDelta (d : Delta') (pc : PC) :=
-    let a := index d.add pc,
-        l := index d.delete pc,
-        m := index d.modify pc
-    in  Delta.mk a l m
+def indexDelta (d : Delta') (ρ : @Config F) : Delta :=
+    let a := d.add | ρ
+    let l := d.delete | ρ
+    let m := d.modify | ρ
+    Delta.mk a l m
 
-instance Delta_has_index : has_index Delta' :=
+instance Delta_Variational : Variational F Delta Delta' :=
 ⟨ indexDelta ⟩
 
-def restrict' (t : TraceRel') (d : Delta') : TraceRel' :=
-    let relevant := d.add ∪ d.delete ∪ d.modify
-    in  {x | x ∈ t ∧ x.1 ∈ relevant} 
+--instance : Variational F TraceRel TraceRel' :=
+--    vset.Variational
+@[simp]
+def allElements' (d: Delta') : vset F SysEl :=
+     (d.add ∪ d.delete ∪ d.modify)
 
-theorem restrict_correct : ∀ (pc : PC) (t : TraceRel') (d : Delta'), 
-    index (restrict' t d) pc = restrict (index t pc) (indexDelta d pc)
-    :=
-begin
-    intros, rw restrict', rw indexDelta, simp, rw restrict, rw allElements, simp,
-    apply funext, intros, repeat {rw set_of}, repeat {rw index_union},
-    repeat {rw index_mem}, rw index, repeat {rw function.comp}, simp,
-    rw and_comm _ pc, rw and_comm _ pc, rw and_assoc, rw← and_assoc (x ∈ t), 
-    rw← and_assoc _ (x ∈ t ∧ pc), rw and_comm _ (x ∈ t ∧ pc), simp, rw and_comm _ pc,
-    rw← and_assoc 
-end
+def restrict' (t: TraceRel') (d : Delta') : TraceRel' :=
+    {x | x ∈ t ∧ ((x.1.1, x.2) ∈ allElements' d)}
 
-def trace' (t : TraceRel') (es : set' SysEl) : set' GSNEl :=
-    λ (g:GSNEl), ∃ (s : SysEl) , es s ∧ t ⟨s , g⟩
+theorem restrict_correct: ∀ (ρ : @Config F) (t : TraceRel') (d : Delta'),
+    ((restrict' t d) | ρ) = restrict (t | ρ) (d | ρ) :=
+by
+    intros ρ t d
+    simp [restrict']
+    simp [←Set.setOf_or, Variational.index]
+    unfold vset.index
+    simp [setOf, ←(and_or_left)]
+    simp [restrict, indexDelta, allElements, ←Set.setOf_or, index_mem, setOf]
+    apply funext
+    intros x
+    simp [Set.mem_def]
 
-theorem trace_correct : ∀ (t : TraceRel') (es : set' SysEl) (pc : PC),
-    index (trace' t es) pc = trace (index t pc) (index es pc)
-    :=
-begin
-    intros, rw trace', rw index, rw function.comp, rw CIA.trace, simp, unfold set.image,
-    rw set_of,  simp, apply funext, intros, simp, split,
-    { intros h, apply exists.elim h.2, intros a g, existsi a, repeat {rw index_mem}, split,
-      split, exact g.2, exact h.1, split, exact g.1, exact h.1},
-    { intros h, apply exists.elim h, intros a g, repeat {rw index_mem at g}, split,
-      exact g.1.2, existsi a, split, exact g.2.1, exact g.1.1}
-end
+def trace' (t : TraceRel') (es : vset F SysEl) : vset F GSNEl :=
+    Set.image (λx:((SysEl × GSNEl) × Config F) ↦ (x.1.2, x.2)) {e | e ∈ t ∧ (e.1.1, e.2) ∈ es}
 
-def createAnnotation'   (g : GSN') 
-                        (recheck : set' GSNEl)
-                        (revise : set' GSNEl)
-                    : set' (GSNEl × Annotation) :=
-    let ch := image (λ e, (e, Annotation.Recheck)) recheck,
-        rv := image (λ e, (e, Annotation.Revise)) revise,
-        n  := image (λ e, (e, Annotation.Reuse)) (g - (recheck ∪ revise))
-    in  ch ∪ rv ∪ n
+theorem trace_correct : ∀ (t : TraceRel') (es : vset F SysEl) (ρ : Config F),
+    ((trace' t es) | ρ) = trace (t | ρ) (es | ρ) :=
+by
+    intros t es ρ
+    simp [trace', Variational.index]
+    unfold vset.index
+    simp [trace, setOf]
+    apply funext
+    intros x
+    simp[Set.image, setOf, Set.mem_def]
+
+def createAnnotation'   (g : GSN')
+                        (recheck : vset F GSNEl)
+                        (revise : vset F GSNEl)
+                    : vset F (GSNEl × Annotation) :=
+    let ch := Set.image (λ e ↦ ((e.1, Annotation.Recheck), e.2)) recheck
+    let rv := Set.image (λ e ↦ ((e.1, Annotation.Revise), e.2)) revise
+    let n  := Set.image (λ e ↦ ((e.1, Annotation.Reuse), e.2)) (g \ (recheck ∪ revise))
+    ch ∪ rv ∪ n
 
 theorem createAnnotation_correct:
-    ∀ (g : GSN') (recheck : set' GSNEl) (revise : set' GSNEl) (pc : PC),
-    index (createAnnotation' g recheck revise) pc =
-    createAnnotation (index g pc) (index recheck pc) (index revise pc)
-    :=  
-begin
-    intros, unfold createAnnotation', repeat {rw image},
-    simp, unfold createAnnotation, repeat {rw set.image}, simp,
-    rw index, repeat {rw function.comp}, repeat {rw set_of}, apply funext, intros, simp, split,
-    { intros h, rw set'.union, }
-    rw set.union,
-    rw exists.intro,  
-    rw index, rw function.comp, unfold has_sub.sub,
-    repeat {rw set.union_def}, 
-    repeat {unfold has_sub.sub}, repeat{rw set.mem_def},
-    rw createAnnotation, rw createAnnotation', simp, 
-    repeat {rw image},  dsimp, unfold has_sdiff.sdiff, 
-    rw set.diff, simp, funext, simp, rw and_or_distrib_right,
-    repeat {rw image}, repeat {rw set.union_def}, simp, 
-    repeat {rw set.union_def}, dsimp, 
-    repeat {rw set.mem_def}, 
-end
+    ∀ (g : GSN') (recheck : vset F GSNEl) (revise : vset F GSNEl) (ρ : Config F),
+    ((createAnnotation' g recheck revise) | ρ) =
+    createAnnotation (g | ρ) (recheck | ρ) (revise | ρ) :=
+by
+    intros g recheck revise ρ
+    simp [createAnnotation', Set.image]
+    simp [←Set.setOf_or, Variational.index]
+    unfold vset.index
+    simp [createAnnotation, Set.image, ←Set.setOf_or, setOf]
+    apply funext
+    intros x
+    simp[Set.mem_def, Set.union_def, setOf]
 
 open Delta'
 
@@ -123,43 +137,27 @@ def GSN_IA' (S S' : Sys')
             (A  : GSN')
             (R  : TraceRel')
             (D  : Delta')
-            : set' (GSNEl × Annotation) :=
-    let R'          := restrict' R D,
-        C1dm        := sliceSys' S (D.delete ∪ D.modify),
-        C1am        := sliceSys' S' (D.add ∪ D.modify),
-        C2Recheck   := (trace' R C1dm) ∪ (trace' R' C1am),
-        C2Revise    := trace' R D.delete,
-        C3Recheck1  := sliceGSN_V' A C2Revise,
-        C3Recheck2  := sliceGSN_R' A (C2Recheck ∪ C3Recheck1)
-    in  createAnnotation' A C3Recheck2 C2Revise
+            : vset F (GSNEl × Annotation) :=
+    let R'          := restrict' R D
+    let C1dm        := sliceSys' S (D.delete ∪ D.modify)
+    let C1am        := sliceSys' S' (D.add ∪ D.modify)
+    let C2Recheck   := (trace' R C1dm) ∪ (trace' R' C1am)
+    let C2Revise    := trace' R D.delete
+    let C3Recheck1  := sliceGSN_V' A C2Revise
+    let C3Recheck2  := sliceGSN_R' A (C2Recheck ∪ C3Recheck1)
+    createAnnotation' A C3Recheck2 C2Revise
 
-universe u
-variables {α β γ : Type}
-
-open set
-
-lemma index_union : ∀ {α : Type _} (s₁ s₂ : set' α) (pc : PC),
-(index (s₁ ∪ s₂) pc) = (index s₁ pc) ∪ (index s₂ pc) :=
-begin
-    intros, unfold has_union.union, unfold liftedSet.union, unfold set.union, 
-    unfold has_mem.mem, unfold set.mem, 
-    rw index, rw index, rw index,
-    rw function.comp, rw function.comp, rw function.comp, simp,  
-    apply funext, intro, 
-    rw and_or_distrib_left, refl
-end 
-
-theorem GSN_IA'_correct : 
-    ∀ (S S' : Sys') (A  : GSN') (R  : TraceRel') (D : Delta') (pc : PC),
-    (GSN_IA' S S' A R D) | pc = GSN_IA  (S | pc) (S' | pc) (A | pc) (R | pc) (indexDelta D pc) 
+theorem GSN_IA'_correct :
+    ∀ (S S' : Sys') (A  : GSN') (R  : TraceRel') (D : Delta') (ρ : Config F),
+    ((GSN_IA' S S' A R D) | ρ) = GSN_IA  (S | ρ) (S' | ρ) (A | ρ) (R | ρ) (D | ρ)
     :=
-begin
-    intros, rw GSN_IA', rw GSN_IA, simp, 
-    rw← restrict_correct, rw indexDelta, simp,
-    rw ←index_union, rw ←index_union, rw← sliceSys_correct, 
-    rw← trace_correct, rw← trace_correct, rw← sliceSys_correct,
-    rw← trace_correct, rw← sliceGSNV_correct, rw ←index_union,
-    rw ←index_union, rw← sliceGSNR_correct, rw← createAnnotation_correct
-end
+by
+    intros S S' A R D ρ
+    simp [GSN_IA', GSN_IA]
+    simp [←restrict_correct]
+    simp [Delta_Variational, indexDelta, index_union, ←sliceSys_correct]
+    simp [←trace_correct]
+    simp [←sliceGSNV_correct, index_union]
+    simp [←sliceGSNR_correct, ←createAnnotation_correct]
 
 end liftedCIA

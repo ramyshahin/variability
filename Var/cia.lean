@@ -4,14 +4,18 @@ import Mathlib.Data.Finset.Powerset
 
 namespace CIA
 
-opaque SysElCount: ℕ
-opaque GSNElCount: ℕ
+--opaque SysElCount: ℕ
+--opaque GSNElCount: ℕ
 
-def SysEl: Type := Fin SysElCount
+opaque SysEl: Type
+
+--def SysEl: Type := Fin SysElCount
 
 def SySEls := Set SysEl
 
-def GSNEl: Type := Fin GSNElCount
+opaque GSNEl: Type
+
+--def GSNEl: Type := Fin GSNElCount
 
 def GSNEls := Set GSNEl
 
@@ -43,13 +47,12 @@ def restrict (t : TraceRel) (d : Delta) : TraceRel :=
     {x:(SysEl × GSNEl) | x ∈ t ∧ x.1 ∈ allElements d }
 
 def trace (t : TraceRel) (es : Set SysEl) : Set GSNEl :=
-    Set.image (λx:(SysEl × GSNEl) ↦ x.2)
-        {e: (SysEl × GSNEl) | e ∈ t ∧ e.1 ∈ es }
+    Set.image (λx:(SysEl × GSNEl) ↦ x.2) {e: (SysEl × GSNEl) | e ∈ t ∧ e.1 ∈ es }
 
 def createAnnotation    (g : GSN)
                         (recheck : Set GSNEl)
                         (revise : Set GSNEl)
-                    : Set (GSNEl × Annotation) :=
+: Set (GSNEl × Annotation) :=
     let ch := Set.image (λ e ↦ (e, Annotation.Recheck)) recheck
     let rv := Set.image (λ e ↦ (e, Annotation.Revise)) revise
     let ru := Set.image (λ e ↦ (e, Annotation.Reuse))
@@ -63,7 +66,7 @@ def GSN_IA  (S  : Sys)
             (A  : GSN)
             (R  : TraceRel)
             (D  : Delta)
-            : Set (GSNEl × Annotation) :=
+: Set (GSNEl × Annotation) :=
     let R'          := restrict R D
     let C1dm        := sliceSys S (D.delete ∪ D.modify)
     let C1am        := sliceSys S' (D.add ∪ D.modify)

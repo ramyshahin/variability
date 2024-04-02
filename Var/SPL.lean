@@ -17,7 +17,7 @@ variable (s: SPL F)
 
 -- a configuration is a set of features
 @[reducible]
-def Config: Type := Set F
+def Config (F: Type): Type := Set F
     --Finset F
 
 instance Config.Membership: Membership F (@Config F) :=
@@ -67,7 +67,7 @@ def ConfigSpace := Set (@Config F)
 --instance ConfigSpace.Fintype: Fintype (@ConfigSpace F) :=
 --    Finset.fintype
 
-instance ConfigSpace.Membership: Membership (@Config F) (@ConfigSpace F) :=
+instance ConfigSpace.Membership {F: Type}: Membership (@Config F) (@ConfigSpace F) :=
     inferInstance
 
 @[reducible]
@@ -302,15 +302,21 @@ def ConfigPartition.split {F: Type} {p: @ConfigPartition F} (pc: PC F) : @Config
          (splitDisjoint pc)
          (splitComplete pc)
 
-structure Variational (α : Type) {F: Type} :=
+structure Var {F: Type} (α : Type) :=
     configs: @ConfigPartition F
     vals   : ConfigQuotient configs → α
 
-postfix:50 "↑" => Variational
+postfix:50 "↑" => Var
 
-def index {α F: Type} (l:@Variational α F) (ρ:@Config F) := @ConfigQuotient.mk F l.configs ρ
+class Variational (F: Type) (α β: Type) :=
+    index: β → @Config F → α
 
-notation l "[ " x "] " => index l x
+--notation l "[" x "]" => Variational.index l x
+notation l " | " x => Variational.index l x
+
+instance Var.Variational {F α: Type} : Variational F α (@Var F α) :=
+    ⟨λ l ρ ↦ l.vals (l.configs⟦ρ⟧)⟩
+
 
 end -- section
 
