@@ -6,28 +6,16 @@ import Mathlib.Data.Vector.Mem
 
 namespace SPL
 
-structure SPL (α: Type) where
-
 section
 
 variable{F: Type}
---instance Features_finite: Fintype F := FeatureSet.fin_Features
---instance Features_decEq:  DecidableEq F := FeatureSet.decEq_Features
-variable (s: SPL F)
 
 -- a configuration is a set of features
 @[reducible]
 def Config (F: Type): Type := Set F
-    --Finset F
 
 instance Config.Membership: Membership F (@Config F) :=
     inferInstance
-
---instance Config.Fintype : Fintype (@Config F) :=
---    inferInstance
-
---instance Config.DecidableEq: DecidableEq (@Config F) :=
---    Finset.decidableEq
 
 inductive PC (α:Type): Type
 | All  : PC α
@@ -62,71 +50,43 @@ instance {F: Type} : Complement (@PC F) := Complement.mk PC.Not
 --
 @[reducible]
 def ConfigSpace := Set (@Config F)
-    --Finset (@Config F)
-
---instance ConfigSpace.Fintype: Fintype (@ConfigSpace F) :=
---    Finset.fintype
 
 instance ConfigSpace.Membership {F: Type}: Membership (@Config F) (@ConfigSpace F) :=
     inferInstance
 
 @[reducible]
-def allConfigs: @ConfigSpace F := Set.univ --Finset.univ
+def allConfigs: @ConfigSpace F := Set.univ
 
 end
 
 section
 
---variable {F: Type} [FeatureSet F]
---variable {s: SPL F}
---variable (α: Type)
-
-def semantics {F: Type} /-[FeatureSet F]-/: @PC F → @ConfigSpace F
+def semantics {F: Type}: @PC F → @ConfigSpace F
 | PC.All         => allConfigs
 | PC.None        => ∅
-| PC.Atom f      => {ρ:@Config F | f ∈ ρ} --Finset.filter (λc: Config ↦ f ∈ c) allConfigs
+| PC.Atom f      => {ρ:@Config F | f ∈ ρ}
 | PC.Not pc      => (semantics pc)ᶜ
 | PC.And pc₁ pc₂ => (semantics pc₁) ∩ (semantics pc₂)
 | PC.Or  pc₁ pc₂ => (semantics pc₁) ∪ (semantics pc₂)
 
 notation "⦃" p "⦄" => semantics p
 
---structure Var (α: Type) {F: Type} [fs: FeatureSet F] :=
---    v   : α
---    pc  : @PC F
-
-def disjointPCs {F: Type} /-[FeatureSet F]-/ (pcs: Set (PC F)) : Prop :=
---| nil : disjointPCs [] --F fs []
---| singleton x: disjointPCs [x]
---| cons x xs : (xs.all (λx' ↦ ⦃x⦄ ∩ ⦃x'⦄ == ∅)) → disjointPCs xs → disjointPCs (x :: xs)
+def disjointPCs {F: Type} (pcs: Set (PC F)) : Prop :=
     ∀ (c : @Config F) (pc₁ pc₂ : pcs),
         c ∈ ⦃pc₁.val⦄ → c ∈ ⦃pc₂.val⦄ → pc₁ = pc₂
 
-def completePCs {F: Type} /-[FeatureSet F]-/ (pcs : Set (PC F)) : Prop :=
+def completePCs {F: Type} (pcs : Set (PC F)) : Prop :=
     ∀ (c : @Config F), ∃ (pc : pcs), c ∈ ⦃pc.val⦄
 
-structure ConfigPartition {F: Type} := --[fs: FeatureSet F] :=
+structure ConfigPartition {F: Type} :=
     pcs: Set (PC F)
     disjoint: @disjointPCs F pcs
     complete: @completePCs F pcs
 
---instance {F: Type} (cp: @ConfigPartition F): DecidableEq cp.pcs :=
---    Finset.decidableEq
-/-
-def index {n: ℕ} [fs: FeatureSet F] (p : @ConfigPartition F n fs) (ρ : @Config F) : PC F :=
-    let i := List.findIdx (λ (x: PC F) ↦ ρ ∈ semantics x) p.pcs.toList
-    let pr: i < n :=
-    by
-        rw[←(Vector.length_val p.pcs)]
-        apply List.findIdx_lt_length_of_exists
-        simp
-        apply p.complete
-    p.pcs.get ⟨i, pr⟩
--/
 -- this holds even if we have duplicate atoms within a lifted value
 -- for example: [(7,pc₁), (5,pc₂), (7,pc₃)]. Here configurations
 -- included within pc₁ and pc₃ are considered equivalent.
-instance Config.Setoid {F: Type}/-[fs: FeatureSet F]-/ (p: @ConfigPartition F): Setoid (@Config F) := {
+instance Config.Setoid {F: Type} (p: @ConfigPartition F): Setoid (@Config F) := {
     r := λ (ρ₁ ρ₂: @Config F) ↦ ∃!pc: p.pcs, ρ₁ ∈ ⦃pc.val⦄ ∧ ρ₂ ∈ ⦃pc.val⦄
     iseqv := {
         refl  := by
@@ -180,7 +140,7 @@ instance Config.Setoid {F: Type}/-[fs: FeatureSet F]-/ (p: @ConfigPartition F): 
   }
 }
 
-def ConfigQuotient /-[fs: FeatureSet F]-/ (p: @ConfigPartition F) : Type := Quotient (Config.Setoid p)
+def ConfigQuotient (p: @ConfigPartition F) : Type := Quotient (Config.Setoid p)
 
 def ConfigQuotient.mk {F: Type} (p: @ConfigPartition F) (ρ: @Config F) : ConfigQuotient p :=
     @Quotient.mk' _ (Config.Setoid p) ρ
@@ -189,16 +149,13 @@ notation p "⟦ " c "⟧ " => ConfigQuotient.mk p c
 
 def singletonCP {F: Type} :=
     @ConfigPartition.mk F
-        {PC.All} --::ᵥ Vector.nil)
+        {PC.All}
         (by simp[disjointPCs])
         (by simp[completePCs, semantics])
 
 def Set.split (α: Type) (s: Set α) (f: α → (α × α)) : Set α :=
 Set.image (Prod.fst ∘ f) s ∪ Set.image (Prod.snd ∘ f) s
 
-
---| 0, .nil, _ => .nil
---| Nat.succ k, v, f => let p:= f v.head; p.fst ::ᵥ p.snd ::ᵥ (split k v.tail f)
 lemma splitDisjoint {F: Type} {p: @ConfigPartition F} (pc: PC F):
     disjointPCs (Set.split (PC F) p.pcs (λ p ↦ (pc &&& p, ~~~pc &&& p))) :=
 by
@@ -311,7 +268,6 @@ postfix:50 "↑" => Var
 class Variational (F: Type) (α β: Type) :=
     index: β → @Config F → α
 
---notation l "[" x "]" => Variational.index l x
 notation l " | " x => Variational.index l x
 
 instance Var.Variational {F α: Type} : Variational F α (@Var F α) :=

@@ -4,18 +4,11 @@ import Mathlib.Data.Finset.Powerset
 
 namespace CIA
 
---opaque SysElCount: ℕ
---opaque GSNElCount: ℕ
-
 opaque SysEl: Type
-
---def SysEl: Type := Fin SysElCount
 
 def SySEls := Set SysEl
 
 opaque GSNEl: Type
-
---def GSNEl: Type := Fin GSNElCount
 
 def GSNEls := Set GSNEl
 

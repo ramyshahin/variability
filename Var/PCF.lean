@@ -1,3 +1,4 @@
+/-
 import data.finset
 import tactic.induction
 
@@ -7,7 +8,7 @@ namespace PCF
 def vname := string
 
 @[derive [decidable_eq]]
-inductive τ 
+inductive τ
 | Nat : τ
 | Bool : τ
 | Arrow : τ → τ → τ
@@ -35,17 +36,17 @@ inductive expr
 
 -- fv: free variables in expressions
 def fv : expr → finset vname
-| expr.Zero         := ∅ 
+| expr.Zero         := ∅
 | (expr.succ e)     := fv e
 --| (expr.pred e)     := fv e
-| expr.True         := ∅ 
+| expr.True         := ∅
 | expr.False        := ∅
 | (expr.zero e)     := fv e
 | (expr.Var v)      := {v}
 | (expr.ITE c t e)  := (fv c) ∪ (fv t) ∪ (fv e)
 | (expr.LAM v t b)  := (fv b) \ {v}
 | (expr.APP e₀ e₁)  := (fv e₀) ∪ (fv e₁)
-| (expr.FIX v t b)  := (fv b) \ {v} 
+| (expr.FIX v t b)  := (fv b) \ {v}
 
 -- substitution
 def sub (s: expr) (v: vname) : expr → expr
@@ -64,13 +65,13 @@ def sub (s: expr) (v: vname) : expr → expr
 -- type environment
 def env : Type := vname → option τ
 def emptyEnv : env := λ x, none
-def addType (Γ: env) (v: vname) (t: τ) : env := 
+def addType (Γ: env) (v: vname) (t: τ) : env :=
 λ x, if (x = v) then (some t) else (Γ x)
 
 -- typing function
 def typing : env → expr → option τ
 | _ expr.Zero         := τ.Nat
-| Γ (expr.succ e)     := if typing Γ e = some τ.Nat then some τ.Nat else none 
+| Γ (expr.succ e)     := if typing Γ e = some τ.Nat then some τ.Nat else none
 --| Γ (expr.pred e)     := if typing Γ e = some τ.Nat then some τ.Nat else none
 | _ expr.True         := τ.Bool
 | _ expr.False        := τ.Bool
@@ -124,18 +125,18 @@ inductive big_step : expr → expr → Prop
 
 infix ` ⟹ ` : 110 := big_step
 
-theorem big_step_deterministic {e₀ e₁ e₂} 
-  (h₀: e₀ ⟹ e₁) (h₁: e₀ ⟹ e₂) : 
+theorem big_step_deterministic {e₀ e₁ e₂}
+  (h₀: e₀ ⟹ e₁) (h₁: e₀ ⟹ e₂) :
   e₁ = e₂ :=
 begin
-  induction' h₀, 
+  induction' h₀,
     case succ {
-      cases h₁, 
-      simp, 
-      apply ih, 
+      cases h₁,
+      simp,
+      apply ih,
       assumption },
     case zero_t {
-      cases h₁, 
+      cases h₁,
       refl,
       have h₂ := ih h₁_h, cases h₂},
     case zero_f: e₃ e₄ {
@@ -156,8 +157,8 @@ begin
     },
     -- easy cases
     repeat {cases h₁, refl},
-    -- succ 
-    rw ih e₁, 
+    -- succ
+    rw ih e₁,
     cases h₁, rw h₀_ih, refl,
     -- true
     cases h₁, refl,
@@ -179,3 +180,4 @@ def denoteT : τ → Type
 end denotational
 
 end PCF
+-/

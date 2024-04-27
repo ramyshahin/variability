@@ -1,3 +1,4 @@
+/-
 -- variability_test.lean
 -- testing the variability module
 import data.set tactic data.setoid.partition  data.finset
@@ -51,3 +52,4 @@ def v₁ : Var := Var.mk p₁ [7, 3]
 #eval p₁
 #eval (to_bool (is_eqv p₁ {FB} {FC}))
 #eval (is_eqv p₁ {FB} {FA})
+-/

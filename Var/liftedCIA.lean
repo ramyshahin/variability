@@ -18,35 +18,11 @@ abbrev GSNEl' := @Var GSNEl F
 abbrev Sys' : Type := vset F SysEl
 abbrev GSN' : Type := vset F GSNEl
 
---@[derive has_mem (SysEl × GSNEl)]
 abbrev TraceRel' := vset F (SysEl × GSNEl)
-
---instance: has_mem (SysEl × GSNEl ) TraceRel' := liftedSet.liftedSet_has_mem
-
---def indexTraceRel (t: TraceRel') (pc : @PC F) : Set (SysEl × GSNEl) :=
---    index t pc
-
---instance TraceRel_has_index : has_index TraceRel' :=
---⟨ indexTraceRel ⟩
-
-
---opaque sliceSys: Sys → Set SysEl → Sys
---opaque sliceGSN_V: GSN → Set GSNEl → GSN
---opaque sliceGSN_R: GSN → Set GSNEl → GSN
 
 opaque sliceSys': Sys' → (@vset F SysEl) → Sys'
 opaque sliceGSN_V': GSN' → (@vset F GSNEl) → GSN'
 opaque sliceGSN_R': GSN' →  @vset F GSNEl → GSN'
-
---variable (sliceSys': Sys' → (@vset F SysEl) → Sys')
---variable (sliceGSN_V': GSN' → (@vset F GSNEl) → GSN')
---variable (sliceGSN_R': GSN' →  @vset F GSNEl → GSN')
-
---instance : Variational F Sys Sys' :=
---    vset.Variational
-
---instance : Variational F GSN GSN' :=
---    vset.Variational
 
 axiom sliceSys_correct:
 ∀ (s : Sys')  (es : @vset F SysEl) (ρ : @Config F),
@@ -72,8 +48,6 @@ def indexDelta (d : Delta') (ρ : @Config F) : Delta :=
 instance Delta_Variational : Variational F Delta Delta' :=
 ⟨ indexDelta ⟩
 
---instance : Variational F TraceRel TraceRel' :=
---    vset.Variational
 @[simp]
 def allElements' (d: Delta') : vset F SysEl :=
      (d.add ∪ d.delete ∪ d.modify)
